@@ -1,0 +1,7 @@
+*.wast
+*.wasm
+.nodeos
+.vscode
+node_modules/
+package-lock.json
+jest_*/

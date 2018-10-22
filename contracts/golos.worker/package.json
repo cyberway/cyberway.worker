@@ -1,0 +1,15 @@
+{
+  "name": "golos.worker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "eosio.test": "git+https://github.com/distributex/eosio.test.git",
+    "jest": "^23.6.0"
+  }
+}
