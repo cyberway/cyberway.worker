@@ -257,7 +257,6 @@ public:
       STATE_TSPEC_APP = 1,
       STATE_TSPEC_CREATE,
       STATE_WORK,
-      STATE_TSPEC_AUTHOR_REVIEW,
       STATE_DELEGATES_REVIEW,
       STATE_PAYMENT,
       STATE_CLOSED
@@ -902,12 +901,11 @@ public:
    * @param proposal_id proposal ID
    * @param comment_id comment ID
    * @param comment comment data
-   * @param finished true if all work done
    */
   /// @abi action
-  void poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment, bool finished)
+  void poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment)
   {
-    LOG("proposal_id: %, comment: %, final: %", proposal_id, comment.text.c_str(), (int) finished);
+    LOG("proposal_id: %, comment: %", proposal_id, comment.text.c_str());
     auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
@@ -915,11 +913,6 @@ public:
 
     get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
       proposal.work_status.add(comment_id, proposal.worker, comment);
-
-      if (finished)
-      {
-        proposal.set_state(proposal_t::STATE_TSPEC_AUTHOR_REVIEW);
-      }
     });
   }
 
@@ -934,7 +927,7 @@ public:
   {
     LOG("proposal_id: %, comment: %", proposal_id, comment.text.c_str());
     auto proposal_ptr = get_proposal(proposal_id);
-    eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_AUTHOR_REVIEW, "invalid proposal state");
+    eosio_assert(proposal_ptr->state == proposal_t::STATE_DELEGATES_REVIEW, "invalid proposal state");
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
     require_auth(proposal_ptr->tspec_author);
 
@@ -964,8 +957,7 @@ public:
       {
       case proposal_t::STATUS_REJECT:
         eosio_assert(proposal.state == proposal_t::STATE_DELEGATES_REVIEW ||
-                         proposal.state == proposal_t::STATE_WORK ||
-                         proposal.state == proposal_t::STATE_TSPEC_AUTHOR_REVIEW,
+                         proposal.state == proposal_t::STATE_WORK,
                      "invalid state " __FILE__ ":" TOSTRING(__LINE__));
 
         proposal.review_votes.downvote(reviewer);

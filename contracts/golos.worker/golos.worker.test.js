@@ -330,7 +330,6 @@ it(
         proposal.id,
         commentId++,
         { text: "Work in progress #1" },
-        0,
         { authorization: tspec.worker }
       );
 
@@ -340,7 +339,6 @@ it(
         proposal.id,
         commentId++,
         { text: "I finished all tasks" },
-        1,
         { authorization: tspec.worker }
       );
       expect((await getProposal(proposal.id)).state).toEqual(
