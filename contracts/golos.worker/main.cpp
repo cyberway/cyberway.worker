@@ -1042,7 +1042,7 @@ public:
   }
 
   // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
-  static void transfer(uint64_t code, currency::transfer &t)
+  static void transfer(uint64_t code, transfer_args &t)
   {
     print_f("%: transfer % from \"%\" to \"%\"", __FUNCTION__, t.quantity, ACCOUNT_NAME_CSTR(t.from), ACCOUNT_NAME_CSTR(t.to));
 
