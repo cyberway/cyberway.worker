@@ -38,7 +38,7 @@ bool execute_app_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args..
         read_action_data(buffer, size);
     }
 
-    auto args = unpack<std::tuple<std::decay_t<symbol_name> /* app domain */, std::decay_t<Args>... /* function args */>>((char *)buffer, size);
+    auto args = unpack<std::tuple<std::decay_t<account_name> /* app domain */, std::decay_t<Args>... /* function args */>>((char *)buffer, size);
 
     if (max_stack_buffer_size < size)
     {

@@ -35,7 +35,7 @@ class worker : public contract
 public:
   static constexpr uint32_t voting_time_s = 7 * 24 * 3600;
 
-  typedef symbol_name app_domain_t;
+  typedef account_name app_domain_t;
   typedef uint64_t comment_id_t;
 
   struct comment_data_t
@@ -1060,10 +1060,7 @@ public:
       return;
     }
 
-    eosio_assert(t.quantity.is_valid(), "Quntity is invalid");
-    eosio_assert(t.quantity.amount > 0, "Invalid transfer amount");
-
-    const account_name &payer = t.to;
+    const account_name &payer = t.from;
 
     auto fund = self.get_funds().find(t.from);
     if (fund == self.get_funds().end())
@@ -1076,7 +1073,6 @@ public:
     else
     {
       self.get_funds().modify(fund, payer, [&](auto &fund) {
-        eosio_assert(fund.owner == t.from, "invalid fund owner");
         fund.quantity += t.quantity;
       });
     }
