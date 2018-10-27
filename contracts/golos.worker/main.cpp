@@ -191,14 +191,18 @@ public:
     void upvote(account_name voter)
     {
       eosio_assert(!upvotes.has(voter), "already upvoted");
-      eosio_assert(!downvotes.has(voter), "already downvoted");
+      if (downvotes.has(voter)) {
+          downvotes.unset(voter);
+      }
       upvotes.set(voter);
     }
 
     void downvote(account_name voter)
     {
-      eosio_assert(!upvotes.has(voter), "already upvoted");
       eosio_assert(!downvotes.has(voter), "already downvoted");
+      if (upvotes.has(voter)) {
+          upvotes.unset(voter);
+      }
       downvotes.set(voter);
     }
 
