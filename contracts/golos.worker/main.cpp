@@ -130,6 +130,7 @@ public:
     asset development_cost;
     block_timestamp development_eta;
     uint8_t payments_count;
+    uint32_t payment_interval;
 
     EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count));
 
@@ -292,6 +293,8 @@ public:
     ///< perpetrator account name
     account_name worker;
     block_timestamp work_begining_time;
+    block_timestamp payment_begining_time;
+
     comments_module_t work_status;
     uint8_t worker_payments_count;
 
@@ -440,6 +443,7 @@ protected:
 
   void enable_worker_reward(proposal_t &proposal)
   {
+    proposal.payment_begining_time = TIMESTAMP_NOW;
     proposal.set_state(proposal_t::STATE_PAYMENT);
   }
 
@@ -1010,9 +1014,8 @@ public:
     }
     else
     {
-      const uint32_t payment_interval = proposal_ptr->tspec.development_eta.to_time_point().sec_since_epoch() / proposal_ptr->tspec.payments_count;
-      const uint32_t payment_epoch = (now() - proposal_ptr->work_begining_time.to_time_point().sec_since_epoch()) / payment_interval;
-      LOG("payment epoch: %, interval: %s, worker payments: %", payment_epoch, payment_interval, int(proposal_ptr->worker_payments_count));
+      const uint32_t payment_epoch = (now() - proposal_ptr->payment_begining_time.to_time_point().sec_since_epoch()) / proposal_ptr->tspec.payment_interval;
+      LOG("payment epoch: %, interval: %s, worker payments: %", payment_epoch, proposal_ptr->tspec.payment_interval, int(proposal_ptr->worker_payments_count));
       eosio_assert(payment_epoch > proposal_ptr->worker_payments_count, "can't withdraw right now");
 
       quantity = proposal_ptr->tspec.development_cost / proposal_ptr->tspec.payments_count;
