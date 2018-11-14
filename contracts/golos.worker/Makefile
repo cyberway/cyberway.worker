@@ -1,7 +1,7 @@
 
 CONTRACT := golos.worker
 
-SRC := main.cpp
+SRC := golos.worker.cpp
 CXX := eosiocpp
 
 all: $(CONTRACT).wast $(CONTRACT).abi

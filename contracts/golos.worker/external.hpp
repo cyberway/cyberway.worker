@@ -13,5 +13,5 @@ struct transfer_args {
        account_name  from;
        account_name  to;
        eosio::asset  quantity;
-       eosio::string memo;
+       std::string memo;
 };

@@ -1,6 +1,6 @@
 #include <eosiolib/eosio.hpp>
+#include <eosiolib/asset.hpp>
 #include <eosiolib/action.hpp>
-#include <eosiolib/currency.hpp>
 #include <eosiolib/time.hpp>
 #include <eosiolib/crypto.h>
 #include <eosiolib/singleton.hpp>
@@ -37,6 +37,7 @@ public:
 
   typedef account_name app_domain_t;
   typedef uint64_t comment_id_t;
+  typedef uint64_t proposal_id_t;
 
   struct comment_data_t
   {
@@ -45,23 +46,25 @@ public:
     EOSLIB_SERIALIZE(comment_data_t, (text));
   };
 
+  //@abi table proposals i64
   struct comment_t
   {
     comment_id_t id;
+    proposal_id_t foreign_id;
     account_name author;
     comment_data_t data;
     block_timestamp created;
     block_timestamp modified;
 
-    EOSLIB_SERIALIZE(comment_t, (id)(author)(data)(created)(modified));
+    uint64_t primary_key() const { return id; }
+    uint64_t get_secondary_1() const { return foreign_id; }
+
+    EOSLIB_SERIALIZE(comment_t, (id)(foreign_id)(author)(data)(created)(modified));
   };
 
+  template <uint64_t table_name>
   struct comments_module_t
   {
-    vector<comment_t> comments;
-
-    EOSLIB_SERIALIZE(comments_module_t, (comments));
-
     void add(comment_id_t id, account_name author, const comment_data_t &data)
     {
       eosio_assert(std::find_if(comments.begin(), comments.end(), [&](const comment_t &comment) {
@@ -118,55 +121,25 @@ public:
         comment_ptr->data.text = data.text;
       }
     }
+
+    using comments = multi_index<table_name, comment_t,
+        indexed_by<N(proposal_index), const_mem_fun<comment_t, uint64_t, &comment_t::get_secondary_1>>>;
   };
 
-  typedef uint64_t tspec_id_t;
 
-  struct tspec_data_t
-  {
-    string text;
-    asset specification_cost;
-    block_timestamp specification_eta;
-    asset development_cost;
-    block_timestamp development_eta;
-    uint8_t payments_count;
-    uint32_t payment_interval;
+  struct vote_t {
+    uint64_t id;
+    uint64_t foreign_id;
+    name voter;
+    bool positive;
 
-    EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count));
+    uint64_t get_primary_key() const { return id; }
+    uint64_t get_secondary_1() const { return foreign_id; }
 
-    void update(const tspec_data_t &that)
-    {
-      if (!that.text.empty())
-      {
-        text = that.text;
-      }
-      if (that.specification_cost.amount != 0)
-      {
-        specification_cost = that.specification_cost;
-      }
-
-      if (that.specification_eta != TIMESTAMP_UNDEFINED)
-      {
-        specification_eta = that.specification_eta;
-      }
-
-      if (that.development_cost.amount != 0)
-      {
-        development_cost = that.development_cost;
-      }
-
-      if (that.development_eta != TIMESTAMP_UNDEFINED)
-      {
-        development_eta = that.development_eta;
-      }
-
-      if (that.payments_count != 0)
-      {
-        payments_count = that.payments_count;
-      }
-    }
+    EOSLIB_SERIALIZE(vote_t, (id)(foreign_id)(voter)(positive))
   };
 
+  template <uint64_t TABLE_NAME>
   struct voting_module_t
   {
     enum vote_value_t
@@ -174,9 +147,6 @@ public:
       VOTE_DOWN = 0,
       VOTE_UP = 1
     };
-
-    set_t<account_name> upvotes;
-    set_t<account_name> downvotes;
 
     bool upvoted(account_name voter)
     {
@@ -227,32 +197,87 @@ public:
       downvotes.unset(voter);
     }
 
-    EOSLIB_SERIALIZE(voting_module_t, (upvotes)(downvotes));
+    using voting_table_t = multi_index<TABLE_NAME, vote_t,
+     indexed_by<N(proposal_index), const_mem_fun<vote_t, uint64_t, &vote_t::get_secondary_1>>>;
+  };
+
+  typedef uint64_t tspec_id_t;
+
+  struct tspec_data_t
+  {
+    string text;
+    asset specification_cost;
+    block_timestamp specification_eta;
+    asset development_cost;
+    block_timestamp development_eta;
+    uint8_t payments_count;
+    uint32_t payment_interval;
+
+    EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count));
+
+    void update(const tspec_data_t &that)
+    {
+      if (!that.text.empty())
+      {
+        text = that.text;
+      }
+      if (that.specification_cost.amount != 0)
+      {
+        specification_cost = that.specification_cost;
+      }
+
+      if (that.specification_eta != TIMESTAMP_UNDEFINED)
+      {
+        specification_eta = that.specification_eta;
+      }
+
+      if (that.development_cost.amount != 0)
+      {
+        development_cost = that.development_cost;
+      }
+
+      if (that.development_eta != TIMESTAMP_UNDEFINED)
+      {
+        development_eta = that.development_eta;
+      }
+
+      if (that.payments_count != 0)
+      {
+        payments_count = that.payments_count;
+      }
+    }
   };
 
   struct tspec_app_t
   {
     tspec_id_t id;
+    tspec_id_t foreign_id;
+
     account_name author;
-
     tspec_data_t data;
-
-    voting_module_t votes;
-    comments_module_t comments;
 
     block_timestamp created;
     block_timestamp modified;
 
-    EOSLIB_SERIALIZE(tspec_app_t, (id)(author)(data)(votes)(comments)(created)(modified));
+    EOSLIB_SERIALIZE(tspec_app_t, (id)(author)(data)(created)(modified));
 
     void modify(const tspec_data_t &that)
     {
       data.update(that);
       modified = TIMESTAMP_NOW;
     }
+
+    uint64_t get_primary_key() const { return id; }
+    uint64_t get_secondary_1() const { return foreign_id; }
   };
 
-  typedef uint64_t proposal_id_t;
+  template <uint64_t TABLE_NAME>
+  struct tspec_apps_module_t {
+      using votes = voting_module_t<N(tspecappv)>;
+      using comments = comments_module_t<N(tspecappc)>;
+      using tspec_apps_t = multi_index<TABLE_NAME, tspec_app_t,
+        indexed_by<N(foreign_index), const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::get_secondary_1>>>;
+  };
 
   //@abi table proposals i64
   struct proposal_t
@@ -286,10 +311,11 @@ public:
     string description;
     account_name fund_name;
     asset deposit;
-    voting_module_t votes;
-    comments_module_t comments;
-    // technical specification applications
-    vector<tspec_app_t> tspec_apps;
+
+    voting_module_t<N(proposalsv)> votes;
+    comments_module_t<N(proposalsc)> comments;
+    tspec_apps_module_t<N(tspecapps)> tspec_apps;
+
     ///< technical specification author
     account_name tspec_author;
     ///< technical specification data
@@ -299,10 +325,10 @@ public:
     block_timestamp work_begining_time;
     block_timestamp payment_begining_time;
 
-    comments_module_t work_status;
+    comments_module_t<N(workstatus)> work_status;
     uint8_t worker_payments_count;
 
-    voting_module_t review_votes;
+    voting_module_t<N(proposalsrv)> review_votes;
 
     block_timestamp created;
     block_timestamp modified;
@@ -314,7 +340,7 @@ public:
     void set_state(state_t new_state) { state = new_state; }
   };
 
-  typedef multi_index<N(proposals), proposal_t> proposals_t;
+  using proposals_t = multi_index<N(proposals), proposal_t>;
   proposals_t _proposals;
 
   //@abi table states i64
@@ -340,7 +366,7 @@ public:
     uint64_t primary_key() const { return owner; }
   };
 
-  typedef multi_index<N(funds), fund_t> funds_t;
+  using funds_t = multi_index<N(funds), fund_t>;
   funds_t _funds;
 
   app_domain_t _app = 0;
@@ -826,7 +852,7 @@ public:
       {
       case voting_module_t::VOTE_UP:
         if (tspec->votes.upvotes.size() >= witness_count_51)
-        {  
+        {
           //TODO: check that all voters are delegates in this moment
           choose_proposal_tspec(o, *tspec, author);
         }
@@ -863,7 +889,7 @@ public:
    */
   /// @abi action
   void startwork(proposal_id_t proposal_id, account_name worker)
-  {  
+  {
     LOG("proposal_id: %, worker: %", proposal_id, ACCOUNT_NAME_CSTR(worker));
     auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_CREATE, "invalid proposal state");
@@ -971,7 +997,7 @@ public:
         proposal.review_votes.downvote(reviewer);
 
         if (proposal.review_votes.downvotes.size() >= wintess_count_75)
-        {  
+        {
           //TODO: check that all voters are delegates in this moment
           LOG("work has been rejected by the delegates voting, got % negative votes", proposal.review_votes.downvotes.size());
           refund(proposal, reviewer);
