@@ -45,7 +45,6 @@ public:
 
     EOSLIB_SERIALIZE(comment_data_t, (text));
   };
-
   //@abi table proposals i64
   struct comment_t
   {
@@ -63,23 +62,26 @@ public:
   };
 
   template <uint64_t table_name>
-  struct comments_module_t
+  class comments_module_t
   {
+    using comments_table = multi_index<table_name, comment_t,
+      indexed_by<N(foreign_index), const_mem_fun<comment_t, uint64_t, &comment_t::get_secondary_1>>>;
+
+    comments_table comments;
+  public:
+    comments_module_t(uint64_t code, uint64_t scope): comments(code, scope) {}
+
     void add(comment_id_t id, account_name author, const comment_data_t &data)
     {
-      eosio_assert(std::find_if(comments.begin(), comments.end(), [&](const comment_t &comment) {
-                     return comment.id == id;
-                   }) == comments.end(),
-                   "comment with the same id is already exists");
-
-      comment_t comment{
-          .id = id,
-          .author = author,
-          .data = data,
-          .created = TIMESTAMP_NOW,
-          .modified = TIMESTAMP_UNDEFINED};
-
-      comments.push_back(comment);
+      eosio_assert(comments.find(id) == comments.end(), "comment exists");
+      comments.emplace(author, [&](auto &obj) {
+          obj = comment_t{ .id = id,
+                  .author = author,
+                  .data = data,
+                  .created = TIMESTAMP_NOW,
+                  .modified = TIMESTAMP_UNDEFINED
+                };
+      });
     }
 
     auto lookup(comment_id_t id)
@@ -121,11 +123,7 @@ public:
         comment_ptr->data.text = data.text;
       }
     }
-
-    using comments = multi_index<table_name, comment_t,
-        indexed_by<N(proposal_index), const_mem_fun<comment_t, uint64_t, &comment_t::get_secondary_1>>>;
   };
-
 
   struct vote_t {
     uint64_t id;
@@ -148,61 +146,70 @@ public:
       VOTE_UP = 1
     };
 
-    bool upvoted(account_name voter)
-    {
-      return upvotes.has(voter);
-    }
+    using table_t = multi_index<TABLE_NAME, vote_t,
+     indexed_by<N(foreign_index), const_mem_fun<vote_t, uint64_t, &vote_t::get_secondary_1>>>;
 
-    bool downvoted(account_name voter)
-    {
-      return downvotes.has(voter);
-    }
+    table_t votes;
 
-    void upvote(account_name voter)
-    {
-      eosio_assert(!upvotes.has(voter), "already upvoted");
-      if (downvotes.has(voter)) {
-          downvotes.unset(voter);
-      }
-      upvotes.set(voter);
-    }
+    voting_module_t(uint64_t code, uint64_t scope): votes(code, scope) {}
 
-    void downvote(account_name voter)
+    void vote(vote_value_t vote)
     {
-      eosio_assert(!downvotes.has(voter), "already downvoted");
-      if (upvotes.has(voter)) {
-          upvotes.unset(voter);
-      }
-      downvotes.set(voter);
-    }
-
-    void vote(account_name voter, vote_value_t vote)
-    {
-      switch (vote)
-      {
-      case VOTE_UP:
-        upvote(voter);
-        break;
-      case VOTE_DOWN:
-        downvote(voter);
-        break;
-      default:
-        eosio_assert(false, "invalid vote argument");
+      auto vote_ptr = votes.find(vote.voter);
+      if (vote_ptr == votes.end()) { //first vote
+          votes.emplace(vote.voter, [&](auto &obj) {
+              obj = vote;
+          });
+      } else {
+          votes.modify(vote_ptr, vote.author, [&](auto &obj) {
+              obj = vote;
+          });
       }
     }
 
-    void delvote(account_name voter)
-    {
-      upvotes.unset(voter);
-      downvotes.unset(voter);
+    size_t count_positive(uint64_t foreign_id) const {
+        size_t count = 0;
+        auto index = votes.get_index();
+        for (auto tspec_ptr = index.find(foreign_id);
+             tspec_ptr != index.end() && tspec_ptr->foreign_id == foreign_id;
+             tspec_ptr++) {
+            if (tspec_ptr->positive) {
+                count++;
+            }
+        }
+
+        return count;
     }
 
-    using voting_table_t = multi_index<TABLE_NAME, vote_t,
-     indexed_by<N(proposal_index), const_mem_fun<vote_t, uint64_t, &vote_t::get_secondary_1>>>;
+    size_t count_negative(uint64_t foreign_id) const {
+        size_t count = 0;
+        auto index = votes.get_index();
+        for (auto tspec_ptr = index.find(foreign_id);
+             tspec_ptr != index.end() && tspec_ptr->foreign_id == foreign_id;
+             tspec_ptr++) {
+            if (!tspec_ptr->positive) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    size_t count(uint64_t foreign_id) const {
+        size_t count = 0;
+        auto index = votes.get_index();
+        for (auto tspec_ptr = index.find(foreign_id);
+             tspec_ptr != index.end() && tspec_ptr->foreign_id == foreign_id;
+             tspec_ptr++) {
+            count++;
+        }
+
+        return count;
+    }
+
   };
 
   typedef uint64_t tspec_id_t;
-
   struct tspec_data_t
   {
     string text;
@@ -247,7 +254,6 @@ public:
       }
     }
   };
-
   struct tspec_app_t
   {
     tspec_id_t id;
@@ -272,11 +278,18 @@ public:
   };
 
   template <uint64_t TABLE_NAME>
-  struct tspec_apps_module_t {
-      using votes = voting_module_t<N(tspecappv)>;
-      using comments = comments_module_t<N(tspecappc)>;
-      using tspec_apps_t = multi_index<TABLE_NAME, tspec_app_t,
+  class tspec_apps_module_t {
+  public:
+      using votes_t = voting_module_t<N(tspecappv)>;
+      using comments_t = comments_module_t<N(tspecappc)>;
+      using table_t = multi_index<TABLE_NAME, tspec_app_t,
         indexed_by<N(foreign_index), const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::get_secondary_1>>>;
+
+      table_t tspecs;
+      comments_t comments;
+      votes_t votes;
+
+      tspec_apps_module_t(uint64_t code, uint64_t scope): tspecs(code, scope), comments(code, scope), votes(code, scope) {}
   };
 
   //@abi table proposals i64
@@ -311,11 +324,6 @@ public:
     string description;
     account_name fund_name;
     asset deposit;
-
-    voting_module_t<N(proposalsv)> votes;
-    comments_module_t<N(proposalsc)> comments;
-    tspec_apps_module_t<N(tspecapps)> tspec_apps;
-
     ///< technical specification author
     account_name tspec_author;
     ///< technical specification data
@@ -324,17 +332,12 @@ public:
     account_name worker;
     block_timestamp work_begining_time;
     block_timestamp payment_begining_time;
-
-    comments_module_t<N(workstatus)> work_status;
     uint8_t worker_payments_count;
-
-    voting_module_t<N(proposalsrv)> review_votes;
-
     block_timestamp created;
     block_timestamp modified;
     uint8_t state;
 
-    EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(title)(description)(fund_name)(deposit)(votes)(comments)(tspec_apps)(tspec_author)(tspec)(worker)(work_begining_time)(work_status)(worker_payments_count)(review_votes)(created)(modified)(state));
+    EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(title)(description)(fund_name)(deposit)(tspec_author)(tspec)(worker)(work_begining_time)(worker_payments_count)(created)(modified)(state));
 
     uint64_t primary_key() const { return id; }
     void set_state(state_t new_state) { state = new_state; }
@@ -369,8 +372,21 @@ public:
   using funds_t = multi_index<N(funds), fund_t>;
   funds_t _funds;
 
-  app_domain_t _app = 0;
+  using comments_t = comments_module_t<N(proposalsc)>;
+  using votes_t = voting_module_t<N(proposalsv)>;
+  using tspec_apps_t = tspec_apps_module_t<N(proposalss)>;
+  using status_comments_t = comments_module_t<N(statusc)>;
+  using review_comments_t = comments_module_t<N(reviewc)>;
+  using review_votes_t = voting_module_t<N(reviewv)>;
 
+  comments_t _proposal_comments;
+  votes_t _proposal_votes;
+  tspec_apps_t _proposal_tspecs;
+  status_comments_t _proposal_status_comments;
+  review_comments_t _proposal_reivew_comments;
+  review_votes_t _proposal_review_votes;
+
+  app_domain_t _app = 0;
 protected:
   auto get_state()
   {
@@ -411,20 +427,6 @@ protected:
     auto fund_ptr = get_funds().find(fund_name);
     eosio_assert(fund_ptr != get_funds().end(), "fund doesn't exists");
     return fund_ptr;
-  }
-
-  inline auto get_tspec(proposal_t &proposal, tspec_id_t tspec_app_id)
-  {
-    return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
-      return o.id == tspec_app_id;
-    });
-  }
-
-  inline const auto get_tspec(const proposal_t &proposal, tspec_id_t tspec_app_id)
-  {
-    return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
-      return o.id == tspec_app_id;
-    });
   }
 
   void choose_proposal_tspec(proposal_t &proposal, tspec_app_t &tspec_app, account_name modifier)
@@ -500,7 +502,14 @@ public:
                                                  _app(app),
                                                  _state(_self, app),
                                                  _proposals(_self, app),
-                                                 _funds(_self, app)
+                                                 _funds(_self, app),
+                                                 _proposal_comments(_self, app),
+                                                 _proposal_votes(_self, app),
+                                                 _proposal_tspecs(_self, app),
+                                                 _proposal_status_comments(_self, app),
+                                                 _proposal_reivew_comments(_self, app),
+                                                 _proposal_review_votes(_self, app)
+
   {
   }
 
@@ -558,7 +567,7 @@ public:
   /// @abi action
   void addpropos2(proposal_id_t proposal_id, account_name author,
                   const string &title, const string &description,
-                  const tspec_data_t &specification, account_name worker)
+                  tspec_id_t tspec_id, const tspec_data_t &specification, account_name worker)
   {
     require_app_member(author);
 
@@ -576,12 +585,16 @@ public:
       o.tspec = specification;
       o.fund_name = _app;
 
-      o.tspec_apps.push_back(tspec_app_t{
-          .id = 0,
-          .author = author,
-          .data = specification,
-          .created = TIMESTAMP_NOW,
-          .modified = TIMESTAMP_UNDEFINED});
+      _proposal_tspecs.tspecs.emplace(author, [&](tspec_app_t &tspec) {
+          tspec = tspec_app_t {
+                  .id = tspec_id,
+                  .foreign_id = proposal_id,
+                  .author = author,
+                  .data = specification,
+                  .created = TIMESTAMP_NOW,
+                  .modified = TIMESTAMP_UNDEFINED
+            };
+      });
     });
   }
 
@@ -656,7 +669,7 @@ public:
   {
     auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state " __FILE__ ":" TOSTRING(__LINE__));
-    eosio_assert(proposal_ptr->votes.upvotes.size() == 0, "proposal has been approved by one member");
+    eosio_assert(_proposal_votes.count_positive(proposal_id) == 0, "proposal has been already upvoted");
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
     require_app_member(proposal_ptr->author);
