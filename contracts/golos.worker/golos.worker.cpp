@@ -400,15 +400,10 @@ protected:
     //TODO: eosio_assert(golos.ctrl::is_witness(account, _app), "app domain delegate authority is required to do this action");
   }
 
-  proposals_t &get_proposals()
-  {
-    return _proposals;
-  }
-
   const auto get_proposal(proposal_id_t proposal_id)
   {
-    auto proposal = get_proposals().find(proposal_id);
-    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
+    auto proposal = _proposals.find(proposal_id);
+    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
     return proposal;
   }
 
@@ -536,7 +531,7 @@ public:
 
     LOG("adding propos % \"%\" by %", proposal_id, title.c_str(), ACCOUNT_NAME_CSTR(author));
 
-    get_proposals().emplace(author, [&](auto &o) {
+    _proposals.emplace(author, [&](auto &o) {
       o.id = proposal_id;
       o.type = proposal_t::TYPE_1;
       o.author = author;
@@ -568,7 +563,7 @@ public:
 
     LOG("adding propos % \"%\" by %", proposal_id, title.c_str(), name{author}.to_string().c_str());
 
-    get_proposals().emplace(author, [&](proposal_t &o) {
+    _proposals.emplace(author, [&](proposal_t &o) {
       o.id = proposal_id;
       o.type = proposal_t::TYPE_2;
       o.author = author;
@@ -581,7 +576,7 @@ public:
       o.fund_name = _app;
 
       _proposal_tspecs.tspecs.emplace(author, [&](tspec_app_t &tspec) {
-          tspec = tspec_app_t {
+          tspec = {
                   .id = tspec_id,
                   .foreign_id = proposal_id,
                   .author = author,
@@ -602,8 +597,8 @@ public:
   /// @abi action
   void setfund(proposal_id_t proposal_id, account_name fund_name, asset quantity)
   {
-    auto proposal_ptr = get_proposals().find(proposal_id);
-    eosio_assert(proposal_ptr != get_proposals().end(), "proposal has not been found");
+    auto proposal_ptr = _proposals.find(proposal_id);
+    eosio_assert(proposal_ptr != _proposals.end(), "proposal has not been found");
     require_app_member(fund_name);
 
     eosio_assert(proposal_ptr->deposit.amount == 0, "fund is already deposited");
@@ -612,7 +607,7 @@ public:
     auto fund_ptr = get_fund(fund_name);
     eosio_assert(fund_ptr->quantity >= quantity, "insufficient funds");
 
-    get_proposals().modify(proposal_ptr, fund_name, [&](auto &o) {
+    _proposals.modify(proposal_ptr, fund_name, [&](auto &o) {
       o.fund_name = fund_name;
       o.deposit = quantity;
     });
@@ -635,7 +630,7 @@ public:
     require_app_member(proposal_ptr->author);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state " __FILE__ ":" TOSTRING(__LINE__));
 
-    get_proposals().modify(proposal_ptr, proposal_ptr->author, [&](auto &o) {
+    _proposals.modify(proposal_ptr, proposal_ptr->author, [&](auto &o) {
       bool modified = false;
       if (!description.empty())
       {
@@ -668,7 +663,7 @@ public:
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
     require_app_member(proposal_ptr->author);
-    get_proposals().erase(proposal_ptr);
+    _proposals.erase(proposal_ptr);
   }
 
   /**
@@ -680,8 +675,8 @@ public:
   /// @abi action
   void votepropos(proposal_id_t proposal_id, account_name author, uint8_t positive)
   {
-    auto proposal_ptr = get_proposals().find(proposal_id);
-    eosio_assert(proposal_ptr != get_proposals().end(), "proposal has not been found");
+    auto proposal_ptr = _proposals.find(proposal_id);
+    eosio_assert(proposal_ptr != _proposals.end(), "proposal has not been found");
     eosio_assert(voting_time_s + proposal_ptr->created.to_time_point().sec_since_epoch() >= now(), "voting time is over");
     require_app_member(author);
 
@@ -858,7 +853,7 @@ public:
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
     require_auth(proposal_ptr->tspec_author);
 
-    get_proposals().modify(proposal_ptr, proposal_ptr->tspec_author, [&](proposal_t &proposal) {
+    _proposals.modify(proposal_ptr, proposal_ptr->tspec_author, [&](proposal_t &proposal) {
       proposal.tspec.update(data);
     });
   }
@@ -877,7 +872,7 @@ public:
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
     require_auth(proposal_ptr->tspec_author);
 
-    get_proposals().modify(proposal_ptr, proposal_ptr->tspec_author, [&](proposal_t &proposal) {
+    _proposals.modify(proposal_ptr, proposal_ptr->tspec_author, [&](proposal_t &proposal) {
       proposal.worker = worker;
       proposal.work_begining_time = TIMESTAMP_NOW;
       proposal.set_state(proposal_t::STATE_WORK);
@@ -906,7 +901,7 @@ public:
       require_auth(proposal_ptr->tspec_author);
     }
 
-    get_proposals().modify(proposal_ptr, initiator, [&](proposal_t &proposal) {
+    _proposals.modify(proposal_ptr, initiator, [&](proposal_t &proposal) {
       refund(proposal, initiator);
     });
   }
@@ -926,7 +921,7 @@ public:
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
     require_auth(proposal_ptr->worker);
 
-    get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
+    _proposals.modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
       proposal.work_status.add(comment_id, proposal.worker, comment);
     });
   }
@@ -946,7 +941,7 @@ public:
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
     require_auth(proposal_ptr->tspec_author);
 
-    get_proposals().modify(proposal_ptr, proposal_ptr->tspec_author, [&](auto &proposal) {
+    _proposals.modify(proposal_ptr, proposal_ptr->tspec_author, [&](auto &proposal) {
       proposal.set_state(proposal_t::STATE_DELEGATES_REVIEW);
       proposal.work_status.add(comment_id, proposal.tspec_author, comment);
     });
@@ -1045,7 +1040,7 @@ public:
       }
     }
 
-    get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](proposal_t &proposal) {
+    _proposals.modify(proposal_ptr, proposal_ptr->worker, [&](proposal_t &proposal) {
       proposal.deposit -= quantity;
       proposal.worker_payments_count += 1;
 
