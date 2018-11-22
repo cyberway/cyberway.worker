@@ -134,22 +134,22 @@ private:
         }
 
         size_t count_positive(uint64_t foreign_id) const {
-            auto foreign_index = votes.get_index<IndexName>();
-            return std::count_if(foreign_index.lower_bound(foreign_id), foreign_index.upper_bound(foreign_id), [&](const vote_t &vote) {
+            auto index = votes.get_index<IndexName>();
+            return std::count_if(index.lower_bound(foreign_id), index.upper_bound(foreign_id), [&](const vote_t &vote) {
                 return vote.positive;
             });
         }
 
         size_t count_negative(uint64_t foreign_id) const {
-            auto foreign_index = votes.get_index<IndexName>();
-            return std::count_if(foreign_index.lower_bound(foreign_id), foreign_index.upper_bound(foreign_id), [&](const vote_t &vote) {
+            auto index = votes.get_index<IndexName>();
+            return std::count_if(index.lower_bound(foreign_id), index.upper_bound(foreign_id), [&](const vote_t &vote) {
                 return !vote.positive;
             });
         }
 
         size_t count(uint64_t foreign_id) const {
-            auto foreign_index = votes.get_index<IndexName>();
-            return (size_t) foreign_index.upper_bound(foreign_id) - foreign_index.lower_bound(foreign_id) + 1;
+            auto index = votes.get_index<IndexName>();
+            return (size_t) index.upper_bound(foreign_id) - index.lower_bound(foreign_id) + 1;
         }
     };
 
@@ -220,6 +220,7 @@ private:
 
         EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(data)(created)(modified));
     };
+    multi_index<"tspecs"_n, tspec_app_t, indexed_by<"index"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::get_secondary_1>>> _proposal_tspecs;
 
     using proposal_id_t = uint64_t;
     struct [[eosio::table]] proposal_t
@@ -271,7 +272,7 @@ private:
         uint64_t primary_key() const { return id; }
         void set_state(state_t new_state) { state = new_state; }
     };
-    multi_index<"proposals"_n, proposal_t, indexed_by<"index"_n, const_mem_fun<proposal_t, uint64_t, &proposal_t::primary_key>>> _proposals;
+    multi_index<"proposals"_n, proposal_t> _proposals;
 
     struct [[eosio::table]] state_t
     {
@@ -295,7 +296,6 @@ private:
     voting_module_t<"proposalsv"_n, "proposalsvi"_n> _proposal_votes;
     voting_module_t<"tspecappv"_n, "tspecappvi"_n> _proposal_tspec_votes;
     comments_module_t<"tspecappc"_n> _proposal_tspec_comments;
-    multi_index<"tspecs"_n, tspec_app_t, indexed_by<"index"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::get_secondary_1>>> _proposal_tspecs;
     comments_module_t<"statusc"_n> _proposal_status_comments;
     comments_module_t<"reviewc"_n> _proposal_reivew_comments;
     voting_module_t<"reviewv"_n, "reviewvi"_n> _proposal_review_votes;
