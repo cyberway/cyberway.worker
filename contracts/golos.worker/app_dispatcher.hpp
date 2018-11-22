@@ -46,7 +46,7 @@ bool execute_app_action(capi_name receiver, capi_name code, void (Q::*func)(Args
         free(buffer);
     }
 
-    T obj(receiver, code, tuple_head(args));
+    T obj(eosio::name(receiver), eosio::name(code), tuple_head(args));
 
     auto f2 = [&](auto... a) {
         (obj.*func)(a...);
@@ -86,7 +86,7 @@ bool execute_action(capi_name receiver, capi_name code, void (*func)(eosio::name
     }
 
     auto f2 = [&](auto... a) {
-        (func)(code, a...);
+        (func)(eosio::name(code), a...);
     };
 
     boost::mp11::tuple_apply(f2, args);

@@ -6,6 +6,8 @@
 #include <eosiolib/singleton.hpp>
 #include <eosiolib/symbol.hpp>
 #include <eosiolib/name.hpp>
+#include <eosiolib/serialize.hpp>
+#include <algorithm>
 
 #include <string>
 #include <vector>
@@ -59,14 +61,11 @@ private:
         EOSLIB_SERIALIZE(comment_t, (id)(foreign_id)(author)(data)(created)(modified));
     };
 
-    template <eosio::name::raw TABLE_NAME>
-    class comments_module_t
+    template <eosio::name::raw TableName>
+    struct comments_module_t
     {
-        using comments_table = multi_index<TABLE_NAME, comment_t,
-        indexed_by<"foreignidx"_n, const_mem_fun<comment_t, uint64_t, &comment_t::get_secondary_1>>>;
+        multi_index<TableName, comment_t> comments;
 
-        comments_table comments;
-    public:
         comments_module_t(eosio::name code, uint64_t scope): comments(code, scope) {}
 
         void add(comment_id_t id, uint64_t foreign_id, eosio::name author, const comment_data_t &data)
@@ -83,29 +82,9 @@ private:
             });
         }
 
-        auto lookup(comment_id_t id)
-        {
-            auto ptr = std::find_if(comments.begin(), comments.end(), [&](auto &o) {
-                return o.id == id;
-            });
-
-            eosio_assert(ptr != comments.end(), "comment doesn't exist");
-            return ptr;
-        }
-
-        const auto lookup(comment_id_t id) const
-        {
-            const auto ptr = std::find_if(comments.begin(), comments.end(), [&](auto &o) {
-                return o.id == id;
-            });
-
-            eosio_assert(ptr != comments.end(), "comment doesn't exist");
-            return ptr;
-        }
-
         void del(comment_id_t id)
         {
-            auto comment_ptr = lookup(id);
+            const auto comment_ptr = comments.find(id);
             eosio_assert(comment_ptr != comments.end(), "comment doens't exist");
             require_auth(comment_ptr->author);
             comments.erase(comment_ptr);
@@ -113,40 +92,36 @@ private:
 
         void edit(comment_id_t id, const comment_data_t &data)
         {
-            auto comment_ptr = lookup(id);
+            eosio_assert(!data.text.empty(), "nothing to change");
+            auto comment_ptr = comments.find(id);
             eosio_assert(comment_ptr != comments.end(), "comment doesn't exist");
             require_auth(comment_ptr->author);
 
-            if (!data.text.empty())
-            {
-                comment_ptr->data.text = data.text;
-            }
+            comments.modify(comment_ptr, comment_ptr->author, [&](comment_t &obj) {
+                obj.data.text = data.text;
+            });
         }
     };
 
-    struct [[eosio::table]]  vote_t {
+    struct [[eosio::table]] vote_t {
         name voter;
         uint64_t foreign_id;
         bool positive;
 
-        uint64_t get_primary_key() const { return (uint64_t) voter.value; }
+        uint64_t primary_key() const { return (uint64_t) voter.value; }
         uint64_t get_secondary_1() const { return foreign_id; }
 
-        EOSLIB_SERIALIZE(vote_t, (foreign_id)(voter)(positive))
+        EOSLIB_SERIALIZE(vote_t, (foreign_id)(voter)(positive));
     };
-    template <eosio::name::raw TABLE_NAME>
+    template <eosio::name::raw TableName, eosio::name::raw IndexName>
     struct voting_module_t
     {
-        using table_t = multi_index<TABLE_NAME, vote_t,
-        indexed_by<"foreignidx"_n, const_mem_fun<vote_t, uint64_t, &vote_t::get_secondary_1>>>;
-
-        table_t votes;
+        multi_index<TableName, vote_t, indexed_by<IndexName, const_mem_fun<vote_t, uint64_t, &vote_t::get_secondary_1>>> votes;
 
         voting_module_t(eosio::name code, uint64_t scope): votes(code, scope) {}
 
-        void vote(vote_t vote)
-        {
-            auto vote_ptr = votes.find(vote.voter);
+        void vote(vote_t vote) {
+            auto vote_ptr = votes.find(vote.voter.value);
             if (vote_ptr == votes.end()) { //first vote
                 votes.emplace(vote.voter, [&](auto &obj) {
                     obj = vote;
@@ -159,45 +134,23 @@ private:
         }
 
         size_t count_positive(uint64_t foreign_id) const {
-            size_t count = 0;
-            auto index = votes.get_index();
-            for (auto tspec_ptr = index.find(foreign_id);
-                 tspec_ptr != index.end() && tspec_ptr->foreign_id == foreign_id;
-                 tspec_ptr++) {
-                if (tspec_ptr->positive) {
-                    count++;
-                }
-            }
-
-            return count;
+            auto foreign_index = votes.get_index<IndexName>();
+            return std::count_if(foreign_index.lower_bound(foreign_id), foreign_index.upper_bound(foreign_id), [&](const vote_t &vote) {
+                return vote.positive;
+            });
         }
 
         size_t count_negative(uint64_t foreign_id) const {
-            size_t count = 0;
-            auto index = votes.get_index();
-            for (auto tspec_ptr = index.find(foreign_id);
-                 tspec_ptr != index.end() && tspec_ptr->foreign_id == foreign_id;
-                 tspec_ptr++) {
-                if (!tspec_ptr->positive) {
-                    count++;
-                }
-            }
-
-            return count;
+            auto foreign_index = votes.get_index<IndexName>();
+            return std::count_if(foreign_index.lower_bound(foreign_id), foreign_index.upper_bound(foreign_id), [&](const vote_t &vote) {
+                return !vote.positive;
+            });
         }
 
         size_t count(uint64_t foreign_id) const {
-            size_t count = 0;
-            auto index = votes.get_index();
-            for (auto tspec_ptr = index.find(foreign_id);
-                 tspec_ptr != index.end() && tspec_ptr->foreign_id == foreign_id;
-                 tspec_ptr++) {
-                count++;
-            }
-
-            return count;
+            auto foreign_index = votes.get_index<IndexName>();
+            return (size_t) foreign_index.upper_bound(foreign_id) - foreign_index.lower_bound(foreign_id) + 1;
         }
-
     };
 
     typedef uint64_t tspec_id_t;
@@ -262,26 +215,10 @@ private:
             modified = TIMESTAMP_NOW;
         }
 
-        uint64_t get_primary_key() const { return id; }
+        uint64_t primary_key() const { return id; }
         uint64_t get_secondary_1() const { return foreign_id; }
 
-
         EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(data)(created)(modified));
-    };
-
-    template <eosio::name::raw TABLE_NAME>
-    class tspec_apps_module_t {
-    public:
-        using votes_t = voting_module_t<"tspecappv"_n>;
-        using comments_t = comments_module_t<"tspecappc"_n>;
-        using table_t = multi_index<TABLE_NAME, tspec_app_t,
-        indexed_by<"foreignidx"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::get_secondary_1>>>;
-
-        table_t tspecs;
-        comments_t comments;
-        votes_t votes;
-
-        tspec_apps_module_t(eosio::name code, uint64_t scope): tspecs(code, scope), comments(code, scope), votes(code, scope) {}
     };
 
     using proposal_id_t = uint64_t;
@@ -334,7 +271,7 @@ private:
         uint64_t primary_key() const { return id; }
         void set_state(state_t new_state) { state = new_state; }
     };
-    multi_index<"proposals"_n, proposal_t> _proposals;
+    multi_index<"proposals"_n, proposal_t, indexed_by<"index"_n, const_mem_fun<proposal_t, uint64_t, &proposal_t::primary_key>>> _proposals;
 
     struct [[eosio::table]] state_t
     {
@@ -355,11 +292,13 @@ private:
     multi_index<"funds"_n, fund_t> _funds;
 
     comments_module_t<"proposalsc"_n> _proposal_comments;
-    voting_module_t<"proposalsv"_n> _proposal_votes;
-    tspec_apps_module_t<"proposalss"_n> _proposal_tspecs;
+    voting_module_t<"proposalsv"_n, "proposalsvi"_n> _proposal_votes;
+    voting_module_t<"tspecappv"_n, "tspecappvi"_n> _proposal_tspec_votes;
+    comments_module_t<"tspecappc"_n> _proposal_tspec_comments;
+    multi_index<"tspecs"_n, tspec_app_t, indexed_by<"index"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::get_secondary_1>>> _proposal_tspecs;
     comments_module_t<"statusc"_n> _proposal_status_comments;
     comments_module_t<"reviewc"_n> _proposal_reivew_comments;
-    voting_module_t<"reviewv"_n> _proposal_review_votes;
+    voting_module_t<"reviewv"_n, "reviewvi"_n> _proposal_review_votes;
 
     eosio::name _app;
 
@@ -473,11 +412,12 @@ public:
         _funds(_self, app.value),
         _proposal_comments(_self, app.value),
         _proposal_votes(_self, app.value),
-        _proposal_tspecs(_self, app.value),
         _proposal_status_comments(_self, app.value),
         _proposal_reivew_comments(_self, app.value),
-        _proposal_review_votes(_self, app.value)
-
+        _proposal_review_votes(_self, app.value),
+        _proposal_tspecs(_self, app.value),
+        _proposal_tspec_comments(_self, app.value),
+        _proposal_tspec_votes(_self, app.value)
     {
     }
 
@@ -553,7 +493,7 @@ public:
             o.tspec = specification;
             o.fund_name = _app;
 
-            _proposal_tspecs.tspecs.emplace(author, [&](tspec_app_t &tspec) {
+            _proposal_tspecs.emplace(author, [&](tspec_app_t &tspec) {
                 tspec = {
                     .id = tspec_id,
                     .foreign_id = proposal_id,
@@ -718,13 +658,15 @@ public:
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
-        _proposal_tspecs.tspecs.emplace(author, [&](auto &spec) {
-            spec.id = tspec_id;
-            spec.author = author;
-            spec.created = TIMESTAMP_NOW;
-            spec.modified = TIMESTAMP_UNDEFINED;
-            spec.data = tspec;
-            spec.foreign_id = proposal_id;
+        _proposal_tspecs.emplace(author, [&](tspec_app_t &spec) {
+            spec = tspec_app_t {
+                .id = tspec_id,
+                .author = author,
+                .created = TIMESTAMP_NOW,
+                .modified = TIMESTAMP_UNDEFINED,
+                .data = tspec,
+                .foreign_id = proposal_id
+            };
         });
     }
 
@@ -738,7 +680,7 @@ public:
     [[eosio::action]]
     void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec_data)
     {
-        const tspec_app_t &tspec_app = _proposal_tspecs.tspecs.get(tspec_app_id);
+        const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
         LOG("proposal_id: %, tspec_id: %", proposal.id, tspec_app.id);
 
@@ -748,7 +690,7 @@ public:
         eosio_assert(tspec_data.development_cost.symbol == get_state().token_symbol, "invalid token symbol");
 
         require_app_member(tspec_app.author);
-        _proposal_tspecs.tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t &obj) {
+        _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t &obj) {
             obj.data = tspec_data;
         });
     }
@@ -761,15 +703,15 @@ public:
     [[eosio::action]]
     void deltspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id)
     {
-        const tspec_app_t &tspec_app = _proposal_tspecs.tspecs.get(tspec_app_id);
+        const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
         eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
         require_app_member(tspec_app.author);
 
-        eosio_assert(_proposal_tspecs.votes.count_positive(tspec_app.foreign_id) == 0,
+        eosio_assert(_proposal_tspec_votes.count_positive(tspec_app.foreign_id) == 0,
                      "technical specification application can't be deleted because it already has been upvoted"); //Technical Specification 1.e
 
-        _proposal_tspecs.tspecs.erase(tspec_app);
+        _proposal_tspecs.erase(tspec_app);
     }
 
     /**
@@ -784,7 +726,7 @@ public:
     [[eosio::action]]
     void votetspec(tspec_id_t tspec_app_id, eosio::name author, uint8_t vote, comment_id_t comment_id, const comment_data_t &comment)
     {
-        const tspec_app_t &tspec_app = _proposal_tspecs.tspecs.get(tspec_app_id);
+        const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         proposal_id_t proposal_id = tspec_app.foreign_id;
 
         LOG("proposal_id: %, tpsec_id: %, author: %, vote: %", proposal_id, tspec_app_id, ACCOUNT_NAME_CSTR(author), (int)vote);
@@ -799,16 +741,16 @@ public:
 
         if (!comment.text.empty())
         {
-            _proposal_tspecs.comments.add(comment_id, tspec_app_id, author, comment);
+            _proposal_tspec_comments.add(comment_id, tspec_app_id, author, comment);
         }
 
-        _proposal_tspecs.votes.vote(vote_t {
+        _proposal_tspec_votes.vote(vote_t {
                                         .voter = author,
                                         .positive = vote != 0,
                                         .foreign_id = tspec_app_id
                                     });
 
-        if (vote != 0 && _proposal_tspecs.votes.count_positive(tspec_app_id) >= witness_count_51)
+        if (vote != 0 && _proposal_tspec_votes.count_positive(tspec_app_id) >= witness_count_51)
         {
             //TODO: check that all voters are delegates in this moment
             _proposals.modify(proposal, author, [&] (proposal_t &obj) {
@@ -898,10 +840,7 @@ public:
         eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
         require_auth(proposal_ptr->worker);
-
-        _proposals.modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
-            proposal.work_status.add(comment_id, proposal.worker, comment);
-        });
+        _proposal_status_comments.add(comment_id, proposal_ptr->id, proposal_ptr->worker, comment);
     }
 
     /**
@@ -921,8 +860,9 @@ public:
 
         _proposals.modify(proposal_ptr, proposal_ptr->tspec_author, [&](auto &proposal) {
             proposal.set_state(proposal_t::STATE_DELEGATES_REVIEW);
-            proposal.work_status.add(comment_id, proposal.tspec_author, comment);
         });
+
+        _proposal_status_comments.add(comment_id, proposal_ptr->id, proposal_ptr->tspec_author, comment);
     }
 
     /**
