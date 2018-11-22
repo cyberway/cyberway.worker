@@ -1,5 +1,7 @@
 #include <tuple>
 #include <utility>
+#include <eosiolib/name.hpp>
+#include <eosiolib/datastream.hpp>
 
 namespace golos
 {
@@ -25,7 +27,7 @@ auto tuple_tail( std::tuple<Ts...> t )
 }
 
 template <typename T, typename Q, typename... Args>
-bool execute_app_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args...))
+bool execute_app_action(capi_name receiver, capi_name code, void (Q::*func)(Args...))
 {
     size_t size = action_data_size();
     //using malloc/free here potentially is not exception-safe, although WASM doesn't support exceptions
@@ -37,14 +39,14 @@ bool execute_app_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args..
         read_action_data(buffer, size);
     }
 
-    auto args = unpack<std::tuple<std::decay_t<account_name> /* app domain */, std::decay_t<Args>... /* function args */>>((char *)buffer, size);
+    auto args = unpack<std::tuple<std::decay_t<eosio::name> /* app domain */, std::decay_t<Args>... /* function args */>>((char *)buffer, size);
 
     if (max_stack_buffer_size < size)
     {
         free(buffer);
     }
 
-    T obj(receiver, tuple_head(args));
+    T obj(receiver, code, tuple_head(args));
 
     auto f2 = [&](auto... a) {
         (obj.*func)(a...);
@@ -55,7 +57,7 @@ bool execute_app_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args..
 }
 
 #define APP_ACTION_API_CALL(r, TYPENAME, elem)                      \
-    case ::eosio::string_to_name(BOOST_PP_STRINGIZE(elem)):         \
+    case ::eosio::name(BOOST_PP_STRINGIZE(elem)).value:         \
         ::golos::execute_app_action<TYPENAME>(receiver, code, &TYPENAME::elem);         \
         break;
 
@@ -64,7 +66,7 @@ bool execute_app_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args..
 
 
 template <typename... Args>
-bool execute_action(uint64_t receiver, uint64_t code, void (*func)(uint64_t, Args...))
+bool execute_action(capi_name receiver, capi_name code, void (*func)(eosio::name, Args...))
 {
     size_t size = action_data_size();
     //using malloc/free here potentially is not exception-safe, although WASM doesn't support exceptions
@@ -93,7 +95,7 @@ bool execute_action(uint64_t receiver, uint64_t code, void (*func)(uint64_t, Arg
 
 
 #define ACTION_API_CALL(r, TYPENAME, elem)                          \
-    case ::eosio::string_to_name(BOOST_PP_STRINGIZE(elem)):         \
+    case ::eosio::name(BOOST_PP_STRINGIZE(elem)).value:         \
         ::golos::execute_action(receiver, code, TYPENAME::elem);         \
         break;
 
@@ -110,7 +112,7 @@ bool execute_action(uint64_t receiver, uint64_t code, void (*func)(uint64_t, Arg
 #define APP_DOMAIN_ABI(TYPENAME, APP_MEMBERS /* actions that expect app_domain argument */, MEMBERS /* actions that*/)           \
     extern "C"                                                                                                                   \
     {                                                                                                                            \
-        void apply(uint64_t receiver, uint64_t code, uint64_t action)                                                            \
+        void apply(capi_name receiver, capi_name code, capi_name action)                                                            \
         {                                                                                                                        \
             switch (action)                                                                                                      \
             {                                                                                                                    \
