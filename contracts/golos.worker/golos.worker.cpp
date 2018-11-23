@@ -78,7 +78,7 @@ private:
                         .foreign_id = foreign_id,
                         .created = TIMESTAMP_NOW,
                         .modified = TIMESTAMP_UNDEFINED
-            };
+                };
             });
         }
 
@@ -113,12 +113,32 @@ private:
 
         EOSLIB_SERIALIZE(vote_t, (foreign_id)(voter)(positive));
     };
-    template <eosio::name::raw TableName, eosio::name::raw IndexName>
+
+    template <eosio::name::raw TableName>
     struct voting_module_t
     {
-        multi_index<TableName, vote_t, indexed_by<IndexName, const_mem_fun<vote_t, uint64_t, &vote_t::get_secondary_1>>> votes;
+        multi_index<TableName, vote_t, indexed_by<"foreign"_n, const_mem_fun<vote_t, uint64_t, &vote_t::primary_key>>> votes;
 
         voting_module_t(eosio::name code, uint64_t scope): votes(code, scope) {}
+
+        size_t count_positive(uint64_t foreign_id) const {
+            auto index = votes.template get_index<name("foreign")>();
+            return std::count_if(index.lower_bound(foreign_id), index.upper_bound(foreign_id), [&](const vote_t &vote) {
+                return vote.positive;
+            });
+        }
+
+        size_t count_negative(uint64_t foreign_id) const {
+            auto index = votes.template get_index<"foreign"_n>();
+            return std::count_if(index.lower_bound(foreign_id), index.upper_bound(foreign_id), [&](const vote_t &vote) {
+                return !vote.positive;
+            });
+        }
+
+        size_t count(uint64_t foreign_id) const {
+            auto index = votes.template get_index<"foreign"_n>();
+            return (size_t) index.upper_bound(foreign_id) - index.lower_bound(foreign_id) + 1;
+        }
 
         void vote(vote_t vote) {
             auto vote_ptr = votes.find(vote.voter.value);
@@ -131,25 +151,6 @@ private:
                     obj = vote;
                 });
             }
-        }
-
-        size_t count_positive(uint64_t foreign_id) const {
-            auto index = votes.get_index<IndexName>();
-            return std::count_if(index.lower_bound(foreign_id), index.upper_bound(foreign_id), [&](const vote_t &vote) {
-                return vote.positive;
-            });
-        }
-
-        size_t count_negative(uint64_t foreign_id) const {
-            auto index = votes.get_index<IndexName>();
-            return std::count_if(index.lower_bound(foreign_id), index.upper_bound(foreign_id), [&](const vote_t &vote) {
-                return !vote.positive;
-            });
-        }
-
-        size_t count(uint64_t foreign_id) const {
-            auto index = votes.get_index<IndexName>();
-            return (size_t) index.upper_bound(foreign_id) - index.lower_bound(foreign_id) + 1;
         }
     };
 
@@ -293,12 +294,12 @@ private:
     multi_index<"funds"_n, fund_t> _funds;
 
     comments_module_t<"proposalsc"_n> _proposal_comments;
-    voting_module_t<"proposalsv"_n, "proposalsvi"_n> _proposal_votes;
-    voting_module_t<"tspecappv"_n, "tspecappvi"_n> _proposal_tspec_votes;
+    voting_module_t<"proposalsv"_n> _proposal_votes;
+    voting_module_t<"proposalsv"_n> _proposal_tspec_votes;
     comments_module_t<"tspecappc"_n> _proposal_tspec_comments;
     comments_module_t<"statusc"_n> _proposal_status_comments;
     comments_module_t<"reviewc"_n> _proposal_reivew_comments;
-    voting_module_t<"reviewv"_n, "reviewvi"_n> _proposal_review_votes;
+    voting_module_t<"proposalsv"_n> _proposal_review_votes;
 
     eosio::name _app;
 
