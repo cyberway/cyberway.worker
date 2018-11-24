@@ -1,0 +1,7 @@
+*.abi
+*.wast
+*.wasm
+CMakeCache.txt
+cmake_install.cmake
+CMakeFiles
+Makefile
