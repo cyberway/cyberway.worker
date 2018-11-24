@@ -34,7 +34,7 @@ namespace golos
 {
 using std::string;
 
-class worker : public contract
+class [[eosio::contract]] worker : public contract
 {
 private:
     static constexpr uint32_t voting_time_s = 7 * 24 * 3600;

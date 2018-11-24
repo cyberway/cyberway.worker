@@ -3,4 +3,4 @@ project(golos.worker VERSION 1.0.0)
 
 find_package(eosio.cdt)
 
-add_contract( golos.worker golos.worker golos.worker.cpp )
+add_contract( golos.worker worker golos.worker.cpp )
