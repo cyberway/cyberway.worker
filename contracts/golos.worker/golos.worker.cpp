@@ -19,6 +19,7 @@
 #include "app_dispatcher.hpp"
 
 using namespace eosio;
+using namespace std;
 
 #define TOKEN_ACCOUNT "eosio.token"_n
 #define ZERO_ASSET eosio::asset(0, get_state().token_symbol)
@@ -32,8 +33,6 @@ using namespace eosio;
 
 namespace golos
 {
-using std::string;
-
 class [[eosio::contract]] worker : public contract
 {
 private:
@@ -275,7 +274,7 @@ private:
     };
     multi_index<"proposals"_n, proposal_t> _proposals;
 
-    struct [[eosio::table]] state_t
+    struct [[eosio::table("state")]] state_t
     {
         eosio::symbol token_symbol;
         EOSLIB_SERIALIZE(state_t, (token_symbol));
