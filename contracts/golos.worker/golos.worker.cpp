@@ -158,9 +158,9 @@ private:
     {
         string text;
         asset specification_cost;
-        block_timestamp specification_eta;
+        uint32_t specification_eta;
         asset development_cost;
-        block_timestamp development_eta;
+        uint32_t development_eta;
         uint8_t payments_count;
         uint32_t payment_interval;
 
@@ -177,7 +177,7 @@ private:
                 specification_cost = that.specification_cost;
             }
 
-            if (that.specification_eta != TIMESTAMP_UNDEFINED)
+            if (that.specification_eta != 0)
             {
                 specification_eta = that.specification_eta;
             }
@@ -187,7 +187,7 @@ private:
                 development_cost = that.development_cost;
             }
 
-            if (that.development_eta != TIMESTAMP_UNDEFINED)
+            if (that.development_eta != 0)
             {
                 development_eta = that.development_eta;
             }
@@ -216,11 +216,11 @@ private:
         }
 
         uint64_t primary_key() const { return id; }
-        uint64_t get_secondary_1() const { return foreign_id; }
+        uint64_t foreign_key() const { return foreign_id; }
 
         EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(data)(created)(modified));
     };
-    multi_index<"tspecs"_n, tspec_app_t, indexed_by<"index"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::get_secondary_1>>> _proposal_tspecs;
+    multi_index<"tspecs"_n, tspec_app_t, indexed_by<"index"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>> _proposal_tspecs;
 
     using proposal_id_t = uint64_t;
     struct [[eosio::table]] proposal_t
@@ -652,15 +652,15 @@ public:
    * @param tspec technical specification details
    */
     [[eosio::action]]
-    void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_id, eosio::name author, const tspec_data_t &tspec)
+    void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, eosio::name author, const tspec_data_t &tspec)
     {
-        LOG("proposal_id: %, tspec_id: %, author: %", proposal_id, tspec_id, ACCOUNT_NAME_CSTR(author));
+        LOG("proposal_id: %, tspec_id: %, author: %", proposal_id, tspec_app_id, ACCOUNT_NAME_CSTR(author));
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
         _proposal_tspecs.emplace(author, [&](tspec_app_t &spec) {
             spec = tspec_app_t {
-                .id = tspec_id,
+                .id = tspec_app_id,
                 .author = author,
                 .created = TIMESTAMP_NOW,
                 .modified = TIMESTAMP_UNDEFINED,
@@ -691,7 +691,7 @@ public:
 
         require_app_member(tspec_app.author);
         _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t &obj) {
-            obj.data = tspec_data;
+            obj.modify(tspec_data);
         });
     }
 
