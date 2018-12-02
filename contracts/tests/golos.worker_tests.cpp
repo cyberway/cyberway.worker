@@ -17,6 +17,8 @@ using namespace ::eosio;
 using mvo = fc::mutable_variant_object;
 
 #define app_domain "golos.app"
+#define TOKEN_NAME N(eosio.token)
+#define WORKER_NAME N(golos.worker)
 #define ASSERT_SUCCESS(action) BOOST_REQUIRE_EQUAL((action), success())
 
 class base_contract
@@ -52,11 +54,11 @@ class base_contract
         return tester.push_action(move(act), uint64_t(signer));
     }
 
-    // template <account_name TableName, const char* StructName>
-    // fc::variant get_table(name scope) {
-    //     vector<char> data = get_row_by_account(code_account, scope, TableName, scope);
-    //     return data.empty() ? fc::variant() : abi_ser.binary_to_variant(StructName, data, tester.abi_serializer_max_time );
-    // }
+    fc::variant get_table(name table_name, const char *struct_name, name scope)
+    {
+        vector<char> data = tester.get_row_by_account(code_account, scope, table_name, scope);
+        return data.empty() ? fc::variant() : abi_ser.binary_to_variant(struct_name, data, tester.abi_serializer_max_time);
+    }
 };
 
 class token_contract : public base_contract
@@ -102,9 +104,17 @@ class worker_contract : public base_contract
     {
     }
 
-    // using get_state = base_contract::get_table<N(state), "state_t">;
-    // using get_proposals = base_contract::get_table<N(proposals), "proposal_t">;
-    // using get_tspecs = base_contracts::get_table<N(tspecs), "tspec_app_t">;
+    fc::variant get_proposals(name scope) {
+        return base_contract::get_table(N(proposals), "proposal_t", scope);
+    }
+
+    fc::variant get_state(name scope) {
+        return base_contract::get_table(N(state), "state_t", scope);
+    }
+
+    fc::variant get_tspecs(name scope) {
+        return base_contract::get_table(N(tspecs), "tspec_data_t", scope);
+    }
 };
 
 class golos_worker_tester : public tester
@@ -132,26 +142,34 @@ class golos_worker_tester : public tester
             produce_blocks(2);
         }
 
-        create_account(N(golos.worker));
-        create_account(N(eosio.token));
+        create_account(WORKER_NAME);
+        create_account(TOKEN_NAME);
         create_account(N(golos.app));
 
         produce_blocks(2);
 
         base_tester &tester = dynamic_cast<base_tester &>(*this);
-        token = make_unique<token_contract>(tester, N(eosio.token));
-        worker = std::make_unique<worker_contract>(tester, N(golos.worker));
+        token = make_unique<token_contract>(tester, TOKEN_NAME);
+        worker = std::make_unique<worker_contract>(tester, WORKER_NAME);
 
         auto supply = asset::from_string("1000.000 APP");
-        ASSERT_SUCCESS(token->create(N(eosio.token), supply));
+        ASSERT_SUCCESS(token->create(TOKEN_NAME, supply));
+
         for (account_name &account : members)
         {
-            ASSERT_SUCCESS(token->issue(N(eosio.token), account, asset::from_string("5.000 APP"), "initial issue"));
+            ASSERT_SUCCESS(token->issue(TOKEN_NAME, account, asset::from_string("5.000 APP"), "initial issue"));
+            ASSERT_SUCCESS(token->open(account, supply.get_symbol().to_string(), account));
             produce_blocks();
         }
 
+        // create an application domain in the golos.worker
         ASSERT_SUCCESS(worker->push_action(N(golos.app), N(createpool), mvo()("app_domain", app_domain)("token_symbol", supply.get_symbol())));
+        produce_blocks();
 
+        // add some funds to golos.worker contract
+        ASSERT_SUCCESS(token->issue(TOKEN_NAME, name(app_domain), asset::from_string("10.000 APP"), "initial issue"));
+        ASSERT_SUCCESS(token->open(name(app_domain), supply.get_symbol().to_string(), name(app_domain)));
+        ASSERT_SUCCESS(token->transfer(name(app_domain), WORKER_NAME, asset::from_string("10.000 APP"), app_domain));
         produce_blocks();
     }
 };
@@ -184,29 +202,16 @@ try
 {
     ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()("app_domain", app_domain)("proposal_id", 1)("author", members[0])("title", "Proposal #1")("description", "Description #1")));
 
-    ASSERT_SUCCESS(worker->push_action(members[0], N(addtspec), mvo()
-        ("app_domain", app_domain)
-        ("proposal_id", 1)
-        ("tspec_app_id", 1)
-        ("author", members[0].to_string())
-        ("tspec", mvo()("text", "Technical specification #1")
-            ("specification_cost", "1.000 APP")
-            ("specification_eta", 1)
-            ("development_cost", "1 APP")
-            ("development_eta", 1)
-            ("payments_count", 1)
-            ("payment_interval", 1))));
+    ASSERT_SUCCESS(worker->push_action(members[0], N(addtspec), mvo()("app_domain", app_domain)("proposal_id", 1)("tspec_app_id", 1)("author", members[0].to_string())("tspec", mvo()("text", "Technical specification #1")("specification_cost", "1.000 APP")("specification_eta", 1)("development_cost", "1.000 APP")("development_eta", 1)("payments_count", 1)("payment_interval", 1))));
+    ASSERT_SUCCESS(worker->push_action(members[0], N(addtspec), mvo()("app_domain", app_domain)("proposal_id", 1)("tspec_app_id", 2)("author", members[0].to_string())("tspec", mvo()("text", "Technical specification #2")("specification_cost", "2.000 APP")("specification_eta", 1)("development_cost", "2.000 APP")("development_eta", 1)("payments_count", 2)("payment_interval", 1))));
 
-    int i = 0;
-    for (const auto &tspec_app_id: vector<int>{1}) {
-        for (const auto &account: delegates) {
-            ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()
-                ("app_domain", app_domain)
-                ("tspec_app_id", tspec_app_id)
-                ("author", account.to_string())
-                ("vote", (i+1) % 2)
-                ("comment_id", 100 * tspec_app_id + i)
-                ("comment", mvo()("text", "Lorem Ipsum"))));
+    for (const auto &tspec_app_id : vector<int>{1, 2})
+    {
+        int i = 0;
+        for (const auto &account : delegates)
+        {
+            ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()("app_domain", app_domain)("tspec_app_id", tspec_app_id)("author", account.to_string())("vote", (i + 1) % 2)("comment_id", 100 * tspec_app_id + i)("comment", mvo()("text", "Lorem Ipsum"))));
+            i++;
         }
     }
 }
@@ -215,7 +220,6 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(ux_flow_2, golos_worker_tester)
 try
 {
-
 }
 FC_LOG_AND_RETHROW()
 

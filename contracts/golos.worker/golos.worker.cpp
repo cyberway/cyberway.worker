@@ -33,7 +33,7 @@ using namespace std;
 
 namespace golos
 {
-class [[eosio::contract]] worker : public contract
+class[[eosio::contract]] worker : public contract
 {
 private:
     static constexpr uint32_t voting_time_s = 7 * 24 * 3600;
@@ -65,19 +65,18 @@ private:
     {
         multi_index<TableName, comment_t> comments;
 
-        comments_module_t(eosio::name code, uint64_t scope): comments(code, scope) {}
+        comments_module_t(eosio::name code, uint64_t scope) : comments(code, scope) {}
 
         void add(comment_id_t id, uint64_t foreign_id, eosio::name author, const comment_data_t &data)
         {
             eosio_assert(comments.find(id) == comments.end(), "comment exists");
             comments.emplace(author, [&](auto &obj) {
-                obj = comment_t{ .id = id,
-                        .author = author,
-                        .data = data,
-                        .foreign_id = foreign_id,
-                        .created = TIMESTAMP_NOW,
-                        .modified = TIMESTAMP_UNDEFINED
-                };
+                obj.id = id;
+                obj.author = author;
+                obj.data = data;
+                obj.foreign_id = foreign_id;
+                obj.created = TIMESTAMP_NOW;
+                obj.modified = TIMESTAMP_UNDEFINED;
             });
         }
 
@@ -102,12 +101,13 @@ private:
         }
     };
 
-    struct [[eosio::table]] vote_t {
+    struct [[eosio::table]] vote_t
+    {
         name voter;
         uint64_t foreign_id;
         bool positive;
 
-        uint64_t primary_key() const { return (uint64_t) voter.value; }
+        uint64_t primary_key() const { return (uint64_t)voter.value; }
         uint64_t get_secondary_1() const { return foreign_id; }
 
         EOSLIB_SERIALIZE(vote_t, (foreign_id)(voter)(positive));
@@ -116,36 +116,43 @@ private:
     template <eosio::name::raw TableName>
     struct voting_module_t
     {
-        multi_index<TableName, vote_t, indexed_by<"foreign"_n, const_mem_fun<vote_t, uint64_t, &vote_t::primary_key>>> votes;
+        multi_index<TableName, vote_t, indexed_by<"foreign"_n, const_mem_fun<vote_t, uint64_t, &vote_t::get_secondary_1>>> votes;
 
-        voting_module_t(eosio::name code, uint64_t scope): votes(code, scope) {}
+        voting_module_t(eosio::name code, uint64_t scope) : votes(code, scope) {}
 
-        size_t count_positive(uint64_t foreign_id) const {
+        size_t count_positive(uint64_t foreign_id) const
+        {
             auto index = votes.template get_index<name("foreign")>();
             return std::count_if(index.lower_bound(foreign_id), index.upper_bound(foreign_id), [&](const vote_t &vote) {
                 return vote.positive;
             });
         }
 
-        size_t count_negative(uint64_t foreign_id) const {
+        size_t count_negative(uint64_t foreign_id) const
+        {
             auto index = votes.template get_index<"foreign"_n>();
             return std::count_if(index.lower_bound(foreign_id), index.upper_bound(foreign_id), [&](const vote_t &vote) {
                 return !vote.positive;
             });
         }
 
-        size_t count(uint64_t foreign_id) const {
+        size_t count(uint64_t foreign_id) const
+        {
             auto index = votes.template get_index<"foreign"_n>();
-            return (size_t) index.upper_bound(foreign_id) - index.lower_bound(foreign_id) + 1;
+            return (size_t)index.upper_bound(foreign_id) - index.lower_bound(foreign_id) + 1;
         }
 
-        void vote(vote_t vote) {
+        void vote(vote_t vote)
+        {
             auto vote_ptr = votes.find(vote.voter.value);
-            if (vote_ptr == votes.end()) { //first vote
+            if (vote_ptr == votes.end())
+            { //first vote
                 votes.emplace(vote.voter, [&](auto &obj) {
                     obj = vote;
                 });
-            } else {
+            }
+            else
+            {
                 votes.modify(vote_ptr, vote.voter, [&](auto &obj) {
                     obj = vote;
                 });
@@ -334,7 +341,7 @@ protected:
         return fund_ptr;
     }
 
-    void choose_proposal_tspec(proposal_t &proposal, const tspec_app_t &tspec_app, eosio::name modifier)
+    void choose_proposal_tspec(proposal_t & proposal, const tspec_app_t &tspec_app, eosio::name modifier)
     {
         if (proposal.deposit.amount == 0)
         {
@@ -364,7 +371,7 @@ protected:
         }
     }
 
-    void pay_tspec_author(proposal_t &proposal)
+    void pay_tspec_author(proposal_t & proposal)
     {
 
         LOG("paying % to %", proposal.tspec.specification_cost, ACCOUNT_NAME_CSTR(proposal.tspec_author));
@@ -379,13 +386,13 @@ protected:
                 .send();
     }
 
-    void enable_worker_reward(proposal_t &proposal)
+    void enable_worker_reward(proposal_t & proposal)
     {
         proposal.payment_begining_time = TIMESTAMP_NOW;
         proposal.set_state(proposal_t::STATE_PAYMENT);
     }
 
-    void refund(proposal_t &proposal, eosio::name modifier)
+    void refund(proposal_t & proposal, eosio::name modifier)
     {
         eosio_assert(proposal.deposit.amount > 0, "no funds were deposited");
 
@@ -398,14 +405,13 @@ protected:
         proposal.deposit = ZERO_ASSET;
     }
 
-    void close(proposal_t &proposal)
+    void close(proposal_t & proposal)
     {
         proposal.set_state(proposal_t::STATE_CLOSED);
     }
 
 public:
-    worker(eosio::name receiver, eosio::name code, eosio::name app) :
-        contract(receiver, code, eosio::datastream<const char *>(nullptr, 0)),
+    worker(eosio::name receiver, eosio::name code, eosio::name app) : contract(receiver, code, eosio::datastream<const char *>(nullptr, 0)),
         _app(app),
         _state(_self, app.value),
         _proposals(_self, app.value),
@@ -417,9 +423,7 @@ public:
         _proposal_review_votes(_self, app.value),
         _proposal_tspecs(_self, app.value),
         _proposal_tspec_comments(_self, app.value),
-        _proposal_tspec_votes(_self, app.value)
-    {
-    }
+        _proposal_tspec_votes(_self, app.value){}
 
     /**
    * @brief createpool creates workers pool in the application domain
@@ -428,11 +432,12 @@ public:
     [[eosio::action]]
     void createpool(eosio::symbol token_symbol)
     {
-        LOG("creating worker's pool: code=\"%\" app=\"%\"", name(_self).to_string().c_str(), name{_app}.to_string().c_str());
+        LOG("creating worker's pool: code=\"%\" app=\"%\", token_symbol=\"%\"", name(_self).to_string().c_str(), name{_app}.to_string().c_str(), token_symbol);
         eosio_assert(!_state.exists(), "workers pool is already initialized for the specified app domain");
         require_auth(_app);
 
-        _state.set(state_t{.token_symbol = token_symbol}, _app);
+        state_t state{.token_symbol = token_symbol};
+        _state.set(state, _app);
     }
 
     /**
@@ -443,8 +448,7 @@ public:
    * @param description proposal description
    */
     [[eosio::action]]
-    void addpropos(proposal_id_t proposal_id, eosio::name author, string title, string description)
-    {
+    void addpropos(proposal_id_t proposal_id, eosio::name author, string title, string description) {
         require_app_member(author);
 
         LOG("adding propos % \"%\" by %", proposal_id, title.c_str(), ACCOUNT_NAME_CSTR(author));
@@ -474,8 +478,8 @@ public:
    */
     [[eosio::action]]
     void addpropos2(proposal_id_t proposal_id, eosio::name author,
-                    const string &title, const string &description,
-                    tspec_id_t tspec_id, const tspec_data_t &specification, eosio::name worker)
+               const string &title, const string &description,
+               tspec_id_t tspec_id, const tspec_data_t &specification, eosio::name worker)
     {
         require_app_member(author);
 
@@ -492,17 +496,15 @@ public:
             o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
             o.tspec = specification;
             o.fund_name = _app;
+        });
 
-            _proposal_tspecs.emplace(author, [&](tspec_app_t &tspec) {
-                tspec = {
-                    .id = tspec_id,
-                    .foreign_id = proposal_id,
-                    .author = author,
-                    .data = specification,
-                    .created = TIMESTAMP_NOW,
-                    .modified = TIMESTAMP_UNDEFINED
-                };
-            });
+        _proposal_tspecs.emplace(author, [&](tspec_app_t &tspec) {
+            tspec.id = tspec_id;
+            tspec.foreign_id = proposal_id;
+            tspec.author = author;
+            tspec.data = specification;
+            tspec.created = TIMESTAMP_NOW;
+            tspec.modified = TIMESTAMP_UNDEFINED;
         });
     }
 
@@ -513,8 +515,7 @@ public:
    * @param quantity amount of the tokens that will be deposited
    */
     [[eosio::action]]
-    void setfund(proposal_id_t proposal_id, eosio::name fund_name, asset quantity)
-    {
+    void setfund(proposal_id_t proposal_id, eosio::name fund_name, asset quantity) {
         auto proposal_ptr = _proposals.find(proposal_id);
         eosio_assert(proposal_ptr != _proposals.end(), "proposal has not been found");
         require_app_member(fund_name);
@@ -569,12 +570,11 @@ public:
     }
 
     /**
-  * @brief delpropos deletes proposal
-  * @param proposal_id proposal ID to delete
-  */
+      * @brief delpropos deletes proposal
+      * @param proposal_id proposal ID to delete
+      */
     [[eosio::action]]
-    void delpropos(proposal_id_t proposal_id)
-    {
+    void delpropos(proposal_id_t proposal_id) {
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state " __FILE__ ":" TOSTRING(__LINE__));
         eosio_assert(_proposal_votes.count_positive(proposal_id) == 0, "proposal has been already upvoted");
@@ -585,11 +585,11 @@ public:
     }
 
     /**
-   * @brief votepropos places a vote for the proposal
-   * @param proposal_id proposal ID
-   * @param author name of the voting account
-   * @param vote 1 for positive vote, 0 for negative vote. Look at the voting_module_t::vote_t
-   */
+       * @brief votepropos places a vote for the proposal
+       * @param proposal_id proposal ID
+       * @param author name of the voting account
+       * @param vote 1 for positive vote, 0 for negative vote. Look at the voting_module_t::vote_t
+       */
     [[eosio::action]]
     void votepropos(proposal_id_t proposal_id, eosio::name author, uint8_t positive)
     {
@@ -598,23 +598,23 @@ public:
         eosio_assert(voting_time_s + proposal_ptr->created.to_time_point().sec_since_epoch() >= now(), "voting time is over");
         require_app_member(author);
 
-        _proposal_votes.vote(vote_t {
-                                 .foreign_id = proposal_id,
-                                 .voter = author,
-                                 .positive = positive != 0
-                             });
+        vote_t vote{
+            .foreign_id = proposal_id,
+            .voter = author,
+            .positive = positive != 0
+        };
+        _proposal_votes.vote(vote);
     }
 
     /**
-   * @brief addcomment publish a new comment to the proposal
-   * @param proposal_id proposal ID
-   * @param comment_id comment ID
-   * @param author author of the comment
-   * @param data comment data
-   */
+     * @brief addcomment publish a new comment to the proposal
+     * @param proposal_id proposal ID
+     * @param comment_id comment ID
+     * @param author author of the comment
+     * @param data comment data
+     */
     [[eosio::action]]
-    void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, eosio::name author, const comment_data_t &data)
-    {
+    void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, eosio::name author, const comment_data_t &data) {
         LOG("proposal_id: %, comment_id: %, author: %", proposal_id, comment_id, ACCOUNT_NAME_CSTR(author));
         _proposal_comments.add(comment_id, proposal_id, author, data);
     }
@@ -638,8 +638,7 @@ public:
    * @param comment_id comment ID to delete
    */
     [[eosio::action]]
-    void delcomment(comment_id_t comment_id)
-    {
+    void delcomment(comment_id_t comment_id) {
         LOG("comment_id: %", comment_id);
         _proposal_comments.del(comment_id);
     }
@@ -659,14 +658,12 @@ public:
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
         _proposal_tspecs.emplace(author, [&](tspec_app_t &spec) {
-            spec = tspec_app_t {
-                .id = tspec_app_id,
-                .author = author,
-                .created = TIMESTAMP_NOW,
-                .modified = TIMESTAMP_UNDEFINED,
-                .data = tspec,
-                .foreign_id = proposal_id
-            };
+            spec.id = tspec_app_id;
+            spec.author = author;
+            spec.created = TIMESTAMP_NOW;
+            spec.modified = TIMESTAMP_UNDEFINED;
+            spec.data = tspec;
+            spec.foreign_id = proposal_id;
         });
     }
 
@@ -678,8 +675,7 @@ public:
    * @param tspec technical specification details
    */
     [[eosio::action]]
-    void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec_data)
-    {
+    void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec_data) {
         const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
         LOG("proposal_id: %, tspec_id: %", proposal.id, tspec_app.id);
@@ -724,13 +720,11 @@ public:
    * @param comment attached comment data
    */
     [[eosio::action]]
-    void votetspec(tspec_id_t tspec_app_id, eosio::name author, uint8_t vote, comment_id_t comment_id, const comment_data_t &comment)
-    {
+    void votetspec(tspec_id_t tspec_app_id, eosio::name author, uint8_t vote, comment_id_t comment_id, const comment_data_t &comment) {
+        LOG("tpsec.id: %, author: %, vote: %, comment.id: % comment.text: %", tspec_app_id, ACCOUNT_NAME_CSTR(author), (int)vote, comment_id, comment.text.c_str());
+
         const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         proposal_id_t proposal_id = tspec_app.foreign_id;
-
-        LOG("proposal_id: %, tpsec_id: %, author: %, vote: %", proposal_id, tspec_app_id, ACCOUNT_NAME_CSTR(author), (int)vote);
-
         const proposal_t &proposal = _proposals.get(proposal_id);
 
         eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state " __FILE__ ":" TOSTRING(__LINE__));
@@ -744,16 +738,19 @@ public:
             _proposal_tspec_comments.add(comment_id, tspec_app_id, author, comment);
         }
 
-        _proposal_tspec_votes.vote(vote_t {
-                                        .voter = author,
-                                        .positive = vote != 0,
-                                        .foreign_id = tspec_app_id
-                                    });
+        vote_t v{
+            .voter = author,
+            .positive = vote != 0,
+            .foreign_id = tspec_app_id
+        };
+
+        _proposal_tspec_votes.vote(v);
 
         if (vote != 0 && _proposal_tspec_votes.count_positive(tspec_app_id) >= witness_count_51)
         {
             //TODO: check that all voters are delegates in this moment
-            _proposals.modify(proposal, author, [&] (proposal_t &obj) {
+            LOG("technical specification % got 51%% of positive delegates votes", tspec_app_id);
+            _proposals.modify(proposal, author, [&](proposal_t &obj) {
                 choose_proposal_tspec(obj, tspec_app, author);
             });
         }
@@ -783,9 +780,7 @@ public:
    * @param proposal_id proposal ID
    * @param worker worker account name
    */
-    [[eosio::action]]
-    void startwork(proposal_id_t proposal_id, eosio::name worker)
-    {
+    [[eosio::action]] void startwork(proposal_id_t proposal_id, eosio::name worker) {
         LOG("proposal_id: %, worker: %", proposal_id, ACCOUNT_NAME_CSTR(worker));
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_CREATE, "invalid proposal state");
@@ -833,8 +828,7 @@ public:
    * @param comment comment data
    */
     [[eosio::action]]
-    void poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment)
-    {
+    void poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment) {
         LOG("proposal_id: %, comment: %", proposal_id, comment.text.c_str());
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
@@ -849,8 +843,8 @@ public:
    * @param comment_id comment ID
    * @param comment
    */
-    [[eosio::action]]
-    void acceptwork(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment)
+    [[eosio::action]] void
+    acceptwork(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment)
     {
         LOG("proposal_id: %, comment: %", proposal_id, comment.text.c_str());
         auto proposal_ptr = get_proposal(proposal_id);
@@ -874,18 +868,16 @@ public:
    * @param comment comment data, live empty if it isn't required
    */
     [[eosio::action]]
-    void reviewwork(proposal_id_t proposal_id, eosio::name reviewer, uint8_t status, comment_id_t comment_id, const comment_data_t &comment)
-    {
-        LOG("proposal_id: %, comment: %, status: %, reviewer: %", proposal_id, comment.text.c_str(), (int) status, ACCOUNT_NAME_CSTR(reviewer));
+    void reviewwork(proposal_id_t proposal_id, eosio::name reviewer, uint8_t status, comment_id_t comment_id, const comment_data_t &comment) {
+        LOG("proposal_id: %, comment: %, status: %, reviewer: %", proposal_id, comment.text.c_str(), (int)status, ACCOUNT_NAME_CSTR(reviewer));
         require_app_delegate(reviewer);
         auto proposal_ptr = get_proposal(proposal_id);
         require_app_delegate(reviewer);
 
-        _proposal_review_votes.vote(vote_t {
+        _proposal_review_votes.vote(vote_t{
                                         .voter = reviewer,
                                         .positive = status == proposal_t::STATUS_ACCEPT,
-                                        .foreign_id = proposal_id
-                                    });
+                                        .foreign_id = proposal_id});
 
         _proposals.modify(proposal_ptr, reviewer, [&](proposal_t &proposal) {
             switch (static_cast<proposal_t::review_status_t>(status))
@@ -971,18 +963,25 @@ public:
         action(permission_level{_self, "active"_n},
                TOKEN_ACCOUNT, "transfer"_n,
                std::make_tuple(_self, proposal_ptr->worker,
-                                quantity, std::string("worker reward")))
-               .send();
+                               quantity, std::string("worker reward")))
+                .send();
     }
 
     // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
-    static void transfer(eosio::name code, transfer_args &t)
+    static void transfer(eosio::name code, transfer_args & t)
     {
-        print_f("%: transfer % from \"%\" to \"%\"", __FUNCTION__, t.quantity, ACCOUNT_NAME_CSTR(t.from), ACCOUNT_NAME_CSTR(t.to));
+        print_f("%(%): transfer % from \"%\" to \"%\"\n", __FUNCTION__, t.memo.c_str(), t.quantity, ACCOUNT_NAME_CSTR(t.from), ACCOUNT_NAME_CSTR(t.to));
 
         worker self(eosio::name(current_receiver()), code, eosio::name(t.memo.c_str()));
-        if (t.to != self._self || t.quantity.symbol == self.get_state().token_symbol || code != TOKEN_ACCOUNT)
+
+        if (t.quantity.symbol != self.get_state().token_symbol) {
+            print_f("%(%): invalid symbol code: %, expected: %\n", __FUNCTION__, t.memo.c_str(), t.quantity.symbol, self.get_state().token_symbol);
+            return;
+        }
+
+        if (t.to != self._self || code != TOKEN_ACCOUNT)
         {
+            print_f("%(%): invalid beneficiary or contract code\n", __FUNCTION__, t.memo.c_str());
             return;
         }
 
@@ -1002,6 +1001,8 @@ public:
                 fund.quantity += t.quantity;
             });
         }
+
+        print_f("%(%): added % credits to % fund", __FUNCTION__, t.memo.c_str(), t.quantity, t.from.to_string().c_str());
     }
 };
 } // namespace golos
