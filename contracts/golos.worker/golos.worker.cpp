@@ -301,11 +301,11 @@ private:
 
     comments_module_t<"proposalsc"_n> _proposal_comments;
     voting_module_t<"proposalsv"_n> _proposal_votes;
-    voting_module_t<"proposalsv"_n> _proposal_tspec_votes;
+    voting_module_t<"proposalstsv"_n> _proposal_tspec_votes;
     comments_module_t<"tspecappc"_n> _proposal_tspec_comments;
     comments_module_t<"statusc"_n> _proposal_status_comments;
     comments_module_t<"reviewc"_n> _proposal_reivew_comments;
-    voting_module_t<"proposalsv"_n> _proposal_review_votes;
+    voting_module_t<"proposalsrv"_n> _proposal_review_votes;
 
     eosio::name _app;
 
@@ -746,10 +746,11 @@ public:
 
         _proposal_tspec_votes.vote(v);
 
-        if (vote != 0 && _proposal_tspec_votes.count_positive(tspec_app_id) >= witness_count_51)
+        size_t positive_votes_count = _proposal_tspec_votes.count_positive(tspec_app_id);
+        if (vote != 0 && positive_votes_count >= witness_count_51)
         {
             //TODO: check that all voters are delegates in this moment
-            LOG("technical specification % got 51% of positive delegates votes", tspec_app_id);
+            LOG("technical specification % got % positive votes", tspec_app_id, positive_votes_count);
             _proposals.modify(proposal, author, [&](proposal_t &obj) {
                 choose_proposal_tspec(obj, tspec_app, author);
             });
@@ -780,7 +781,8 @@ public:
    * @param proposal_id proposal ID
    * @param worker worker account name
    */
-    [[eosio::action]] void startwork(proposal_id_t proposal_id, eosio::name worker) {
+    [[eosio::action]]
+    void startwork(proposal_id_t proposal_id, eosio::name worker) {
         LOG("proposal_id: %, worker: %", proposal_id, ACCOUNT_NAME_CSTR(worker));
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_CREATE, "invalid proposal state");
@@ -843,12 +845,12 @@ public:
    * @param comment_id comment ID
    * @param comment
    */
-    [[eosio::action]] void
-    acceptwork(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment)
+    [[eosio::action]]
+    void acceptwork(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment)
     {
         LOG("proposal_id: %, comment: %", proposal_id, comment.text.c_str());
         auto proposal_ptr = get_proposal(proposal_id);
-        eosio_assert(proposal_ptr->state == proposal_t::STATE_DELEGATES_REVIEW, "invalid proposal state");
+        eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
         require_auth(proposal_ptr->tspec_author);
 
@@ -874,10 +876,12 @@ public:
         auto proposal_ptr = get_proposal(proposal_id);
         require_app_delegate(reviewer);
 
-        _proposal_review_votes.vote(vote_t{
-                                        .voter = reviewer,
-                                        .positive = status == proposal_t::STATUS_ACCEPT,
-                                        .foreign_id = proposal_id});
+        vote_t vote {.voter = reviewer,
+                     .positive = status == proposal_t::STATUS_ACCEPT,
+                     .foreign_id = proposal_id
+                    };
+
+        _proposal_review_votes.vote(vote);
 
         _proposals.modify(proposal_ptr, reviewer, [&](proposal_t &proposal) {
             switch (static_cast<proposal_t::review_status_t>(status))
@@ -886,7 +890,7 @@ public:
             {
                 eosio_assert(proposal.state == proposal_t::STATE_DELEGATES_REVIEW ||
                              proposal.state == proposal_t::STATE_WORK,
-                             "invalid state " __FILE__ ":" TOSTRING(__LINE__));
+                             "invalid state for negative review");
 
                 size_t negative_votes_count = _proposal_review_votes.count_negative(proposal_id);
                 if (negative_votes_count >= wintess_count_75)
@@ -901,7 +905,7 @@ public:
 
             case proposal_t::STATUS_ACCEPT:
             {
-                eosio_assert(proposal_ptr->state == proposal_t::STATE_DELEGATES_REVIEW, "invalid state " __FILE__ ":" TOSTRING(__LINE__));
+                eosio_assert(proposal_ptr->state == proposal_t::STATE_DELEGATES_REVIEW, "invalid state for positive review");
 
                 size_t positive_votes_count = _proposal_review_votes.count_positive(proposal_id);
                 if (positive_votes_count >= witness_count_51)
@@ -971,6 +975,11 @@ public:
     static void transfer(eosio::name code, transfer_args & t)
     {
         print_f("%(%): transfer % from \"%\" to \"%\"\n", __FUNCTION__, t.memo.c_str(), t.quantity, ACCOUNT_NAME_CSTR(t.from), ACCOUNT_NAME_CSTR(t.to));
+
+        if (t.memo.size() > 13 || t.to.value != current_receiver()) {
+            printf("%(): invalid arguments\n", __FUNCTION__, t.memo.c_str());
+            return;
+        }
 
         worker self(eosio::name(current_receiver()), code, eosio::name(t.memo.c_str()));
 

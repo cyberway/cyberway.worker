@@ -21,6 +21,8 @@ using mvo = fc::mutable_variant_object;
 #define WORKER_NAME N(golos.worker)
 #define ASSERT_SUCCESS(action) BOOST_REQUIRE_EQUAL((action), success())
 
+constexpr const char *long_text = "Lorem ipsum dolor sit amet, amet sint accusam sit te, te perfecto sadipscing vix, eam labore volumus dissentias ne. Est nonumy numquam fierent te. Te pri saperet disputando delicatissimi, pri semper ornatus ad. Paulo convenire argumentum cum te, te vix meis idque, odio tempor nostrum ius ad. Cu doctus mediocrem petentium his, eum sale errem timeam ne. Ludus debitis id qui, vix mucius antiopam ad. Facer signiferumque vis no, sale eruditi expetenda id ius.";
+
 class base_contract
 {
   protected:
@@ -95,6 +97,14 @@ class token_contract : public base_contract
     {
         return push_action(ram_payer, N(open), mvo()("owner", owner)("symbol", symbolname)("ram_payer", ram_payer));
     }
+
+    fc::variant get_account(account_name acc, const string& symbolname)
+    {
+        auto symb = eosio::chain::symbol::from_string(symbolname);
+        auto symbol_code = symb.to_symbol_code().value;
+        vector<char> data = tester.get_row_by_account( N(eosio.token), acc, N(accounts), symbol_code );
+        return data.empty() ? fc::variant() : abi_ser.binary_to_variant("account", data, tester.abi_serializer_max_time);
+    }
 };
 
 class worker_contract : public base_contract
@@ -130,7 +140,7 @@ class golos_worker_tester : public tester
     {
         produce_blocks();
 
-        for (int i = 0; i < 22; i++)
+        for (int i = 0; i < 21; i++)
         {
             name delegate_name = string("delegate") + static_cast<char>('a' + i);
             delegates.push_back(delegate_name);
@@ -221,36 +231,38 @@ try
             ("payments_count", 1)
             ("payment_interval", 1))));
 
-    ASSERT_SUCCESS(worker->push_action(members[0], N(addtspec), mvo()
+    ASSERT_SUCCESS(worker->push_action(members[1], N(addtspec), mvo()
         ("app_domain", app_domain)
         ("proposal_id", 1)
         ("tspec_app_id", 2)
-        ("author", members[0].to_string())
+        ("author", members[1].to_string())
         ("tspec", mvo()("text", "Technical specification #2")
-        ("specification_cost", "2.000 APP")
-        ("specification_eta", 1)
-        ("development_cost", "2.000 APP")
-        ("development_eta", 1)
-        ("payments_count", 2)
-        ("payment_interval", 1))));
+            ("specification_cost", "2.000 APP")
+            ("specification_eta", 1)
+            ("development_cost", "2.000 APP")
+            ("development_eta", 1)
+            ("payments_count", 2)
+            ("payment_interval", 1))));
 
     // vote for the 0 technical specification application
     uint64_t tspec_app_id = 1;
-    int i = 0;
-    for (const auto &account : delegates)
     {
-        ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()
-            ("app_domain", app_domain)
-            ("tspec_app_id", tspec_app_id)
-            ("author", account.to_string())
-            ("vote", i % 2)
-            ("comment_id", 100 + i)
-            ("comment", mvo()("text", "Lorem Ipsum"))));
-        i++;
+        int i = 0;
+        for (const auto &account : delegates)
+        {
+            ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()
+                ("app_domain", app_domain)
+                ("tspec_app_id", tspec_app_id)
+                ("author", account.to_string())
+                ("vote", (i + 1) % 2)
+                ("comment_id", 100 + i)
+                ("comment", mvo()("text", "Lorem Ipsum"))));
+            i++;
+        }
     }
-
-    // after this point (51% voted positively), proposal is in state that doesn't allow voting for another technical specification application
-    // let's check it
+    /* after this point (51% voted positively), proposal is in state that
+      doesn't allow voting for another technical specification application
+      let's check it */
     auto account = delegates[0];
     BOOST_REQUIRE_EQUAL(worker->push_action(delegates[0], N(votetspec), mvo()
             ("app_domain", app_domain)
@@ -259,6 +271,69 @@ try
             ("vote", 1)("comment_id", 200)
             ("comment", mvo()("text", ""))),
         wasm_assert_msg("invalid state"));
+
+    /* ok,technical specification application has been choosen,
+    now technical specification application author should publish
+    a final technical specification */
+    auto author_account = members[0];
+    ASSERT_SUCCESS(worker->push_action(author_account, N(publishtspec), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)
+        ("data", mvo()
+            ("text", long_text)
+            ("specification_cost", "5.000 APP")
+            ("specification_eta", 1)
+            ("development_cost", "5.000 APP")
+            ("development_eta", 1)
+            ("payments_count", 1)
+            ("payment_interval", 1))));
+
+    auto worker_account = members[2];
+    ASSERT_SUCCESS(worker->push_action(author_account, N(startwork), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)
+        ("worker", worker_account.to_string())));
+
+    for (int i = 0; i < 5; i++) {
+        ASSERT_SUCCESS(worker->push_action(worker_account, N(poststatus), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", 1)
+            ("comment_id", 300 + i)
+            ("comment", mvo()
+                ("text", long_text))));
+    }
+
+    ASSERT_SUCCESS(worker->push_action(author_account, N(acceptwork), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)
+        ("comment_id", 400)
+        ("comment", mvo()
+            ("text", long_text))));
+
+    {
+        int i = 0;
+        for (const auto &account : delegates)
+        {
+            ASSERT_SUCCESS(worker->push_action(account, N(reviewwork), mvo()
+                ("app_domain", app_domain)
+                ("proposal_id", 1)
+                ("reviewer", account.to_string())
+                ("status", (i + 1) % 2)
+                ("comment_id", 500 + i)
+                ("comment", mvo()("text", "Lorem Ipsum"))));
+            i++;
+        }
+    }
+
+    ASSERT_SUCCESS(worker->push_action(worker_account, N(withdraw), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)));
+
+   auto worker_balance = token->get_account(worker_account, "3,APP");
+   REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "10.000 APP"));
+
+   auto author_balance = token->get_account(author_account, "3,APP");
+   REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "10.000 APP"));
 }
 FC_LOG_AND_RETHROW()
 
