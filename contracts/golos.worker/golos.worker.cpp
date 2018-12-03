@@ -727,7 +727,7 @@ public:
         proposal_id_t proposal_id = tspec_app.foreign_id;
         const proposal_t &proposal = _proposals.get(proposal_id);
 
-        eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state " __FILE__ ":" TOSTRING(__LINE__));
+        eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state");
         eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
 
         require_app_delegate(author);
@@ -749,7 +749,7 @@ public:
         if (vote != 0 && _proposal_tspec_votes.count_positive(tspec_app_id) >= witness_count_51)
         {
             //TODO: check that all voters are delegates in this moment
-            LOG("technical specification % got 51%% of positive delegates votes", tspec_app_id);
+            LOG("technical specification % got 51% of positive delegates votes", tspec_app_id);
             _proposals.modify(proposal, author, [&](proposal_t &obj) {
                 choose_proposal_tspec(obj, tspec_app, author);
             });
@@ -985,19 +985,19 @@ public:
             return;
         }
 
-        const eosio::name &payer = t.from;
+        const eosio::name &ram_payer = t.to;
 
         auto fund = self._funds.find(t.from.value);
         if (fund == self._funds.end())
         {
-            self._funds.emplace(payer, [&](auto &fund) {
+            self._funds.emplace(ram_payer, [&](auto &fund) {
                 fund.owner = t.from;
                 fund.quantity = t.quantity;
             });
         }
         else
         {
-            self._funds.modify(fund, payer, [&](auto &fund) {
+            self._funds.modify(fund, ram_payer, [&](auto &fund) {
                 fund.quantity += t.quantity;
             });
         }

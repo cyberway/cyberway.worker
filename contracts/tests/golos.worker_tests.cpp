@@ -200,20 +200,65 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(ux_flow_1, golos_worker_tester)
 try
 {
-    ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()("app_domain", app_domain)("proposal_id", 1)("author", members[0])("title", "Proposal #1")("description", "Description #1")));
+    ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)
+        ("author", members[0])
+        ("title", "Proposal #1")
+        ("description", "Description #1")));
 
-    ASSERT_SUCCESS(worker->push_action(members[0], N(addtspec), mvo()("app_domain", app_domain)("proposal_id", 1)("tspec_app_id", 1)("author", members[0].to_string())("tspec", mvo()("text", "Technical specification #1")("specification_cost", "1.000 APP")("specification_eta", 1)("development_cost", "1.000 APP")("development_eta", 1)("payments_count", 1)("payment_interval", 1))));
-    ASSERT_SUCCESS(worker->push_action(members[0], N(addtspec), mvo()("app_domain", app_domain)("proposal_id", 1)("tspec_app_id", 2)("author", members[0].to_string())("tspec", mvo()("text", "Technical specification #2")("specification_cost", "2.000 APP")("specification_eta", 1)("development_cost", "2.000 APP")("development_eta", 1)("payments_count", 2)("payment_interval", 1))));
+    ASSERT_SUCCESS(worker->push_action(members[0], N(addtspec), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)
+        ("tspec_app_id", 1)
+        ("author", members[0].to_string())
+        ("tspec", mvo()
+            ("text", "Technical specification #1")
+            ("specification_cost", "1.000 APP")
+            ("specification_eta", 1)
+            ("development_cost", "1.000 APP")
+            ("development_eta", 1)
+            ("payments_count", 1)
+            ("payment_interval", 1))));
 
-    for (const auto &tspec_app_id : vector<int>{1, 2})
+    ASSERT_SUCCESS(worker->push_action(members[0], N(addtspec), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)
+        ("tspec_app_id", 2)
+        ("author", members[0].to_string())
+        ("tspec", mvo()("text", "Technical specification #2")
+        ("specification_cost", "2.000 APP")
+        ("specification_eta", 1)
+        ("development_cost", "2.000 APP")
+        ("development_eta", 1)
+        ("payments_count", 2)
+        ("payment_interval", 1))));
+
+    // vote for the 0 technical specification application
+    uint64_t tspec_app_id = 1;
+    int i = 0;
+    for (const auto &account : delegates)
     {
-        int i = 0;
-        for (const auto &account : delegates)
-        {
-            ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()("app_domain", app_domain)("tspec_app_id", tspec_app_id)("author", account.to_string())("vote", (i + 1) % 2)("comment_id", 100 * tspec_app_id + i)("comment", mvo()("text", "Lorem Ipsum"))));
-            i++;
-        }
+        ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()
+            ("app_domain", app_domain)
+            ("tspec_app_id", tspec_app_id)
+            ("author", account.to_string())
+            ("vote", i % 2)
+            ("comment_id", 100 + i)
+            ("comment", mvo()("text", "Lorem Ipsum"))));
+        i++;
     }
+
+    // after this point (51% voted positively), proposal is in state that doesn't allow voting for another technical specification application
+    // let's check it
+    auto account = delegates[0];
+    BOOST_REQUIRE_EQUAL(worker->push_action(delegates[0], N(votetspec), mvo()
+            ("app_domain", app_domain)
+            ("tspec_app_id", 1)
+            ("author", account.to_string())
+            ("vote", 1)("comment_id", 200)
+            ("comment", mvo()("text", ""))),
+        wasm_assert_msg("invalid state"));
 }
 FC_LOG_AND_RETHROW()
 
