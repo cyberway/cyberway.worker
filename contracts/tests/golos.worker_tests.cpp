@@ -167,7 +167,7 @@ class golos_worker_tester : public tester
 
         for (account_name &account : members)
         {
-            ASSERT_SUCCESS(token->issue(TOKEN_NAME, account, asset::from_string("5.000 APP"), "initial issue"));
+            ASSERT_SUCCESS(token->issue(TOKEN_NAME, account, asset::from_string("10.000 APP"), "initial issue"));
             ASSERT_SUCCESS(token->open(account, supply.get_symbol().to_string(), account));
             produce_blocks();
         }
@@ -207,7 +207,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(ux_flow_1, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(application_fund, golos_worker_tester)
 try
 {
     ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
@@ -330,17 +330,259 @@ try
         ("proposal_id", 1)));
 
    auto worker_balance = token->get_account(worker_account, "3,APP");
+   REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
+
+   auto author_balance = token->get_account(author_account, "3,APP");
+   REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "15.000 APP"));
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(sponsored_fund, golos_worker_tester)
+try
+{
+    name sponsor_account = members[0];
+    name author_account = members[1];
+    name worker_account = members[2];
+    uint64_t proposal_id = 1;
+
+    ASSERT_SUCCESS(worker->push_action(sponsor_account, N(addpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("author", sponsor_account)
+        ("title", "Proposal #1")
+        ("description", "Description #1")));
+
+    ASSERT_SUCCESS(token->transfer(sponsor_account, WORKER_NAME, asset::from_string("10.000 APP"), app_domain));
+    ASSERT_SUCCESS(worker->push_action(sponsor_account, N(setfund), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("fund_name", sponsor_account.to_string())
+        ("quantity", "10.000 APP")));
+
+    ASSERT_SUCCESS(worker->push_action(author_account, N(addtspec), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("tspec_app_id", 1)
+        ("author", author_account.to_string())
+        ("tspec", mvo()
+            ("text", "Technical specification #1")
+            ("specification_cost", "5.000 APP")
+            ("specification_eta", 1)
+            ("development_cost", "5.000 APP")
+            ("development_eta", 1)
+            ("payments_count", 1)
+            ("payment_interval", 1))));
+
+    ASSERT_SUCCESS(worker->push_action(members[3], N(addtspec), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)
+        ("tspec_app_id", 2)
+        ("author", members[3].to_string())
+        ("tspec", mvo()("text", "Technical specification #2")
+            ("specification_cost", "2.000 APP")
+            ("specification_eta", 1)
+            ("development_cost", "2.000 APP")
+            ("development_eta", 1)
+            ("payments_count", 2)
+            ("payment_interval", 1))));
+
+    // vote for the 0 technical specification application
+    uint64_t tspec_app_id = 1;
+    {
+        int i = 0;
+        for (const auto &account : delegates)
+        {
+            ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()
+                ("app_domain", app_domain)
+                ("tspec_app_id", tspec_app_id)
+                ("author", account.to_string())
+                ("vote", (i + 1) % 2)
+                ("comment_id", 100 + i)
+                ("comment", mvo()("text", "Lorem Ipsum"))));
+            i++;
+        }
+    }
+
+    /* ok,technical specification application has been choosen,
+    now technical specification application author should publish
+    a final technical specification */
+    ASSERT_SUCCESS(worker->push_action(author_account, N(publishtspec), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("data", mvo()
+            ("text", long_text)
+            ("specification_cost", "5.000 APP")
+            ("specification_eta", 1)
+            ("development_cost", "5.000 APP")
+            ("development_eta", 1)
+            ("payments_count", 1)
+            ("payment_interval", 1))));
+
+    ASSERT_SUCCESS(worker->push_action(author_account, N(startwork), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("worker", worker_account.to_string())));
+
+    for (int i = 0; i < 5; i++) {
+        ASSERT_SUCCESS(worker->push_action(worker_account, N(poststatus), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("comment_id", 300 + i)
+            ("comment", mvo()
+                ("text", long_text))));
+    }
+
+    ASSERT_SUCCESS(worker->push_action(author_account, N(acceptwork), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("comment_id", 400)
+        ("comment", mvo()
+            ("text", long_text))));
+
+    {
+        int i = 0;
+        for (const auto &account : delegates)
+        {
+            ASSERT_SUCCESS(worker->push_action(account, N(reviewwork), mvo()
+                ("app_domain", app_domain)
+                ("proposal_id", proposal_id)
+                ("reviewer", account.to_string())
+                ("status", (i + 1) % 2)
+                ("comment_id", 500 + i)
+                ("comment", mvo()("text", "Lorem Ipsum"))));
+            i++;
+        }
+    }
+
+    ASSERT_SUCCESS(worker->push_action(worker_account, N(withdraw), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)));
+
+   auto sponsor_balance = token->get_account(sponsor_account, "3,APP");
+   REQUIRE_MATCHING_OBJECT(sponsor_balance, mvo()("balance", "0.000 APP"));
+
+   auto worker_balance = token->get_account(worker_account, "3,APP");
+   REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
+
+   auto author_balance = token->get_account(author_account, "3,APP");
+   REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "15.000 APP"));
+}
+FC_LOG_AND_RETHROW()
+
+#if 0
+BOOST_FIXTURE_TEST_CASE(developed_feature, golos_worker_tester)
+try
+{
+    name sponsor_account = members[0];
+    name author_account = members[1];
+    uint64_t proposal_id = 1;
+    uint64_t tspec_app_id = 1;
+
+    ASSERT_SUCCESS(worker->push_action(sponsor_account, N(addpropos2), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("author", sponsor_account.to_string())
+        ("title", "Sponsored proposal #1")
+        ("description", "Description #1")
+        ("tspec_id", tspec_id)
+        ("specification", mvo()
+            ("text", long_text)
+            ("specification_cost", "2.500 APP")
+            ("specification_eta", 1)
+            ("development_cost", "2.500 APP")
+            ("development_eta", 1)
+            ("payments_count", 1)
+            ("payment_interval", 1))));
+
+    ASSERT_SUCCESS(token->transfer(sponsor_account, WORKER_NAME, "5.000 APP", app_domain));
+
+    ASSERT_SUCCESS(worker->push_action(sponsor_account, N(setfund), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("fund_name", sponsor_account.to_string())
+        ("quantity", "5.000 APP")));
+
+    // vote for the first technical specification application
+    {
+        int i = 0;
+        for (const auto &account : delegates)
+        {
+            ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()
+                ("app_domain", app_domain)
+                ("tspec_app_id", tspec_app_id)
+                ("author", account.to_string())
+                ("vote", (i + 1) % 2)
+                ("comment_id", 100 + i)
+                ("comment", mvo()("text", "Lorem Ipsum"))));
+            i++;
+        }
+    }
+
+    /* ok,technical specification application has been choosen,
+    now technical specification application author should publish
+    a final technical specification */
+    auto author_account = members[0];
+    ASSERT_SUCCESS(worker->push_action(author_account, N(publishtspec), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)
+        ("data", mvo()
+            ("text", long_text)
+            ("specification_cost", "2.500 APP")
+            ("specification_eta", 1)
+            ("development_cost", "2.500 APP")
+            ("development_eta", 1)
+            ("payments_count", 1)
+            ("payment_interval", 1))));
+
+    auto worker_account = members[2];
+    ASSERT_SUCCESS(worker->push_action(author_account, N(startwork), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)
+        ("worker", worker_account.to_string())));
+
+    for (int i = 0; i < 5; i++) {
+        ASSERT_SUCCESS(worker->push_action(worker_account, N(poststatus), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", 1)
+            ("comment_id", 300 + i)
+            ("comment", mvo()
+                ("text", long_text))));
+    }
+
+    ASSERT_SUCCESS(worker->push_action(author_account, N(acceptwork), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)
+        ("comment_id", 400)
+        ("comment", mvo()
+            ("text", long_text))));
+
+    {
+        int i = 0;
+        for (const auto &account : delegates)
+        {
+            ASSERT_SUCCESS(worker->push_action(account, N(reviewwork), mvo()
+                ("app_domain", app_domain)
+                ("proposal_id", 1)
+                ("reviewer", account.to_string())
+                ("status", (i + 1) % 2)
+                ("comment_id", 500 + i)
+                ("comment", mvo()("text", "Lorem Ipsum"))));
+            i++;
+        }
+    }
+
+    ASSERT_SUCCESS(worker->push_action(worker_account, N(withdraw), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 1)));
+
+   auto worker_balance = token->get_account(worker_account, "3,APP");
    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "10.000 APP"));
 
    auto author_balance = token->get_account(author_account, "3,APP");
    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "10.000 APP"));
-}
-FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(ux_flow_2, golos_worker_tester)
-try
-{
 }
 FC_LOG_AND_RETHROW()
+#endif
 
 BOOST_AUTO_TEST_SUITE_END()
