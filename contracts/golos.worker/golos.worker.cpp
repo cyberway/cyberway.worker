@@ -103,14 +103,15 @@ private:
 
     struct [[eosio::table]] vote_t
     {
+        uint64_t id;
         name voter;
         uint64_t foreign_id;
         bool positive;
 
-        uint64_t primary_key() const { return (uint64_t)voter.value; }
+        uint64_t primary_key() const { return id; }
         uint64_t get_secondary_1() const { return foreign_id; }
 
-        EOSLIB_SERIALIZE(vote_t, (foreign_id)(voter)(positive));
+        EOSLIB_SERIALIZE(vote_t, (id)(foreign_id)(voter)(positive));
     };
 
     template <eosio::name::raw TableName>
@@ -142,20 +143,21 @@ private:
             return (size_t)index.upper_bound(foreign_id) - index.lower_bound(foreign_id) + 1;
         }
 
-        void vote(vote_t vote)
+        void vote(const vote_t &vote)
         {
-            auto vote_ptr = votes.find(vote.voter.value);
+            auto index = votes.template get_index<"foreign"_n>();
+            for (auto vote_ptr = index.lower_bound(vote.foreign_id); vote_ptr != index.upper_bound(vote.foreign_id); vote_ptr++) {
+                if (vote_ptr->voter == vote.voter) {
+                    votes.modify(votes.get(vote_ptr->id), vote.voter, [&](auto &obj) {
+                        obj = vote;
+                    });
 
-            if (vote_ptr == votes.end()) {
-                votes.emplace(vote.voter, [&](auto &obj) {
-                    obj = vote;
-                });
+                    return;
+                }
             }
-            else {
-                votes.modify(vote_ptr, vote.voter, [&](auto &obj) {
-                    obj = vote;
-                });
-            }
+            votes.emplace(vote.voter, [&](auto &obj) {
+                obj = vote;
+            });
         }
     };
 
@@ -599,7 +601,8 @@ public:
         vote_t vote{
             .foreign_id = proposal_id,
             .voter = author,
-            .positive = positive != 0
+            .positive = positive != 0,
+            .id = now() ^ author.value
         };
         _proposal_votes.vote(vote);
     }
@@ -739,7 +742,8 @@ public:
         vote_t v{
             .voter = author,
             .positive = vote != 0,
-            .foreign_id = tspec_app_id
+            .foreign_id = tspec_app_id,
+            .id = now() ^ author.value
         };
 
         _proposal_tspec_votes.vote(v);
@@ -874,10 +878,12 @@ public:
         auto proposal_ptr = get_proposal(proposal_id);
         require_app_delegate(reviewer);
 
-        vote_t vote {.voter = reviewer,
-                     .positive = status == proposal_t::STATUS_ACCEPT,
-                     .foreign_id = proposal_id
-                    };
+        vote_t vote {
+            .voter = reviewer,
+            .positive = status == proposal_t::STATUS_ACCEPT,
+            .foreign_id = proposal_id,
+            .id = now() ^ reviewer.value
+        };
 
         _proposal_review_votes.vote(vote);
 
