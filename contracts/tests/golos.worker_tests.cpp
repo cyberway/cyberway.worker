@@ -227,6 +227,30 @@ try
             ("title", boost::str(boost::format("Proposal #%d") % proposal_id))
             ("description", long_text)));
 
+        // vote for the proposal
+        for (size_t i = 0; i < delegates.size(); i++)
+        {
+            name &delegate = delegates[i];
+
+            ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
+                ("app_domain", app_domain)
+                ("proposal_id", proposal_id)
+                ("author", delegate)
+                ("positive", i % 2)));
+        }
+
+        // revote
+        for (size_t i = 0; i < delegates.size(); i++)
+        {
+            name &delegate = delegates[i];
+
+            ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
+                ("app_domain", app_domain)
+                ("proposal_id", proposal_id)
+                ("author", delegate)
+                ("positive", (i + 1) % 2)));
+        }
+
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
             ("app_domain", app_domain)
             ("proposal_id", proposal_id)

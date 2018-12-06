@@ -53,7 +53,6 @@ private:
         comment_data_t data;
         block_timestamp created;
         block_timestamp modified;
-
         uint64_t primary_key() const { return id; }
         uint64_t get_secondary_1() const { return foreign_id; }
 
@@ -149,7 +148,7 @@ private:
             for (auto vote_ptr = index.lower_bound(vote.foreign_id); vote_ptr != index.upper_bound(vote.foreign_id); vote_ptr++) {
                 if (vote_ptr->voter == vote.voter) {
                     votes.modify(votes.get(vote_ptr->id), vote.voter, [&](auto &obj) {
-                        obj = vote;
+                        obj.positive = vote.positive;
                     });
 
                     return;
@@ -157,6 +156,7 @@ private:
             }
             votes.emplace(vote.voter, [&](auto &obj) {
                 obj = vote;
+                obj.id = now() ^ vote.voter.value;
             });
         }
     };
@@ -601,8 +601,7 @@ public:
         vote_t vote{
             .foreign_id = proposal_id,
             .voter = author,
-            .positive = positive != 0,
-            .id = now() ^ author.value
+            .positive = positive != 0
         };
         _proposal_votes.vote(vote);
     }
@@ -742,8 +741,7 @@ public:
         vote_t v{
             .voter = author,
             .positive = vote != 0,
-            .foreign_id = tspec_app_id,
-            .id = now() ^ author.value
+            .foreign_id = tspec_app_id
         };
 
         _proposal_tspec_votes.vote(v);
@@ -881,8 +879,7 @@ public:
         vote_t vote {
             .voter = reviewer,
             .positive = status == proposal_t::STATUS_ACCEPT,
-            .foreign_id = proposal_id,
-            .id = now() ^ reviewer.value
+            .foreign_id = proposal_id
         };
 
         _proposal_review_votes.vote(vote);
