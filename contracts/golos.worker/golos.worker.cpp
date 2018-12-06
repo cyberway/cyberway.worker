@@ -675,19 +675,19 @@ public:
    * @param tspec technical specification details
    */
     [[eosio::action]]
-    void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec_data) {
+    void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec) {
         const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
         LOG("proposal_id: %, tspec_id: %", proposal.id, tspec_app.id);
 
         eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for edittspec");
         eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
-        eosio_assert(tspec_data.specification_cost.symbol == get_state().token_symbol, "invalid token symbol");
-        eosio_assert(tspec_data.development_cost.symbol == get_state().token_symbol, "invalid token symbol");
+        eosio_assert(tspec.specification_cost.symbol == get_state().token_symbol, "invalid token symbol");
+        eosio_assert(tspec.development_cost.symbol == get_state().token_symbol, "invalid token symbol");
 
         require_app_member(tspec_app.author);
         _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t &obj) {
-            obj.modify(tspec_data);
+            obj.modify(tspec);
         });
     }
 
@@ -697,7 +697,7 @@ public:
    * @param tspec_app_id technical specification application ID
    */
     [[eosio::action]]
-    void deltspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id)
+    void deltspec(tspec_id_t tspec_app_id)
     {
         const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);

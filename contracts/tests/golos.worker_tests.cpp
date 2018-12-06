@@ -292,128 +292,78 @@ try
 }
 FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE(technical_specification_application_CUD, golos_worker_tester)
+try
+{
+    const uint64_t proposal_id = 0;
+    const uint64_t tspec_app_id = 0;
+    const name& proposal_author = members[0];
+    const name& tspec_author = members[1];
+
+    ASSERT_SUCCESS(worker->push_action(proposal_author, N(addpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("author", proposal_author)
+        ("title", "Proposal #1")
+        ("description", "Description #1"))
+    );
+
+    ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("tspec_app_id", tspec_app_id)
+        ("author", tspec_author)
+        ("tspec", mvo()
+            ("text", "Technical specification #1")
+            ("specification_cost", "1.000 APP")
+            ("specification_eta", 1)
+            ("development_cost", "1.000 APP")
+            ("development_eta", 1)
+            ("payments_count", 1)
+            ("payments_interval", 1))));
+
+    ASSERT_SUCCESS(worker->push_action(tspec_author, N(edittspec), mvo()
+        ("app_domain", app_domain)
+        ("tspec_app_id", tspec_app_id)
+        ("tspec", mvo()
+            ("text", "Technical specification #1")
+            ("specification_cost", "2.000 APP")
+            ("specification_eta", 2)
+            ("development_cost", "2.000 APP")
+            ("development_eta", 2)
+            ("payments_count", 2)
+            ("payments_interval", 2))));
+
+    ASSERT_SUCCESS(worker->push_action(tspec_author, N(deltspec), mvo()
+        ("app_domain", app_domain)
+        ("tspec_app_id", tspec_app_id)));
+
+    ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()("app_domain", app_domain)("proposal_id", 0)));
+}
+FC_LOG_AND_RETHROW()
+
 BOOST_FIXTURE_TEST_CASE(application_fund, golos_worker_tester)
 try
 {
     for (uint64_t proposal_id = 0; proposal_id < 5; proposal_id++) {
-        const uint64_t tspec_app_id = proposal_id * 10;
-        const uint64_t other_tspec_app_id = tspec_app_id + 1;
         uint64_t comment_id = proposal_id  * 100;
 
         const name &proposal_author = members[proposal_id * 3];
         const name &tspec_author = members[proposal_id * 3 + 1];
         const name &worker_account = members[proposal_id * 3 + 2];
 
-        ASSERT_SUCCESS(worker->push_action(proposal_author, N(addpropos), mvo()
-            ("app_domain", app_domain)
-            ("proposal_id", proposal_id)
-            ("author", proposal_author)
-            ("title", boost::str(boost::format("Proposal #%d") % proposal_id))
-            ("description", long_text)));
+        add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
 
-        // vote for the proposal
+        // revote for the proposal
         for (size_t i = 0; i < delegates.size(); i++)
         {
             name &delegate = delegates[i];
 
-            ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
-                ("app_domain", app_domain)
-                ("proposal_id", proposal_id)
-                ("author", delegate)
-                ("positive", i % 2)));
-        }
-
-        // revote
-        for (size_t i = 0; i < delegates.size(); i++)
-        {
-            const name& delegate = delegates[i];
             ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
                 ("app_domain", app_domain)
                 ("proposal_id", proposal_id)
                 ("author", delegate)
                 ("positive", (i + 1) % 2)));
-        }
-
-        ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
-            ("app_domain", app_domain)
-            ("proposal_id", proposal_id)
-            ("tspec_app_id", tspec_app_id)
-            ("author", tspec_author.to_string())
-            ("tspec", mvo()
-                ("text", "Technical specification #1")
-                ("specification_cost", "1.000 APP")
-                ("specification_eta", 1)
-                ("development_cost", "1.000 APP")
-                ("development_eta", 1)
-                ("payments_count", 1)
-                ("payments_interval", 1))));
-
-        ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
-            ("app_domain", app_domain)
-            ("proposal_id", proposal_id)
-            ("tspec_app_id", other_tspec_app_id)
-            ("author", tspec_author)
-            ("tspec", mvo()("text", "Technical specification #2")
-                ("specification_cost", "2.000 APP")
-                ("specification_eta", 1)
-                ("development_cost", "2.000 APP")
-                ("development_eta", 1)
-                ("payments_count", 2)
-                ("payments_interval", 1))));
-
-        // vote for the 0 technical specification application
-
-        for (size_t i = 0; i < delegates.size(); i++)
-        {
-            name &delegate = delegates[i];
-
-            ASSERT_SUCCESS(worker->push_action(delegate, N(votetspec), mvo()
-                ("app_domain", app_domain)
-                ("tspec_app_id", tspec_app_id)
-                ("author", delegate.to_string())
-                ("vote", (i + 1) % 2)
-                ("comment_id", comment_id++)
-                ("comment", mvo()("text", "Lorem Ipsum"))));
-        }
-
-        /* after this point (51% voted positively), proposal is in state that
-        doesn't allow voting for another technical specification application
-        let's check it */
-        BOOST_REQUIRE_EQUAL(worker->push_action(delegates[0], N(votetspec), mvo()
-                ("app_domain", app_domain)
-                ("tspec_app_id", other_tspec_app_id)
-                ("author", delegates[0].to_string())
-                ("vote", 1)("comment_id", comment_id++)
-                ("comment", mvo()("text", long_text))),
-            wasm_assert_msg("invalid state for votetspec"));
-
-        /* ok,technical specification application has been choosen,
-        now technical specification application author should publish
-        a final technical specification */
-        ASSERT_SUCCESS(worker->push_action(tspec_author, N(publishtspec), mvo()
-            ("app_domain", app_domain)
-            ("proposal_id", proposal_id)
-            ("data", mvo()
-                ("text", long_text)
-                ("specification_cost", "5.000 APP")
-                ("specification_eta", 1)
-                ("development_cost", "5.000 APP")
-                ("development_eta", 1)
-                ("payments_count", 1)
-                ("payments_interval", 1))));
-
-        ASSERT_SUCCESS(worker->push_action(tspec_author, N(startwork), mvo()
-            ("app_domain", app_domain)
-            ("proposal_id", proposal_id)
-            ("worker", worker_account.to_string())));
-
-        for (int i = 0; i < 5; i++) {
-            ASSERT_SUCCESS(worker->push_action(worker_account, N(poststatus), mvo()
-                ("app_domain", app_domain)
-                ("proposal_id", proposal_id)
-                ("comment_id", comment_id++)
-                ("comment", mvo()
-                    ("text", long_text))));
         }
 
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(acceptwork), mvo()
