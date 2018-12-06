@@ -145,14 +145,13 @@ private:
         void vote(vote_t vote)
         {
             auto vote_ptr = votes.find(vote.voter.value);
-            if (vote_ptr == votes.end())
-            { //first vote
+
+            if (vote_ptr == votes.end()) {
                 votes.emplace(vote.voter, [&](auto &obj) {
                     obj = vote;
                 });
             }
-            else
-            {
+            else {
                 votes.modify(vote_ptr, vote.voter, [&](auto &obj) {
                     obj = vote;
                 });
