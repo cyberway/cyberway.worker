@@ -82,7 +82,7 @@ private:
         void del(comment_id_t id)
         {
             const auto comment_ptr = comments.find(id);
-            eosio_assert(comment_ptr != comments.end(), "comment doens't exist");
+            eosio_assert(comment_ptr != comments.end(), "comment doesn't exist");
             require_auth(comment_ptr->author);
             comments.erase(comment_ptr);
         }

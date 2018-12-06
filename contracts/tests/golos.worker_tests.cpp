@@ -183,6 +183,90 @@ class golos_worker_tester : public tester
         ASSERT_SUCCESS(token->transfer(name(app_domain), WORKER_NAME, asset::from_string("100.000 APP"), app_domain));
         produce_blocks();
     }
+
+    void add_proposal(uint64_t proposal_id, const name& proposal_author, const name& tspec_author, const name& worker_account) {
+        const uint64_t tspec_app_id = proposal_id * 10;
+        const uint64_t other_tspec_app_id = tspec_app_id + 1;
+        uint64_t comment_id = proposal_id  * 100;
+
+        ASSERT_SUCCESS(worker->push_action(proposal_author, N(addpropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("author", proposal_author)
+            ("title", boost::str(boost::format("Proposal #%d") % proposal_id))
+            ("description", long_text)));
+
+        ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("tspec_app_id", tspec_app_id)
+            ("author", tspec_author.to_string())
+            ("tspec", mvo()
+                ("text", "Technical specification #1")
+                ("specification_cost", "1.000 APP")
+                ("specification_eta", 1)
+                ("development_cost", "1.000 APP")
+                ("development_eta", 1)
+                ("payments_count", 1)
+                ("payments_interval", 1))));
+
+        ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("tspec_app_id", other_tspec_app_id)
+            ("author", tspec_author)
+            ("tspec", mvo()("text", "Technical specification #2")
+                ("specification_cost", "2.000 APP")
+                ("specification_eta", 1)
+                ("development_cost", "2.000 APP")
+                ("development_eta", 1)
+                ("payments_count", 2)
+                ("payments_interval", 1))));
+
+        // vote for the 0 technical specification application
+
+        for (size_t i = 0; i < delegates.size(); i++)
+        {
+            const name &delegate = delegates[i];
+
+            ASSERT_SUCCESS(worker->push_action(delegate, N(votetspec), mvo()
+                ("app_domain", app_domain)
+                ("tspec_app_id", tspec_app_id)
+                ("author", delegate.to_string())
+                ("vote", (i + 1) % 2)
+                ("comment_id", comment_id++)
+                ("comment", mvo()("text", "Lorem Ipsum"))));
+        }
+
+        /* ok,technical specification application has been choosen,
+        now technical specification application author should publish
+        a final technical specification */
+        ASSERT_SUCCESS(worker->push_action(tspec_author, N(publishtspec), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("data", mvo()
+                ("text", long_text)
+                ("specification_cost", "5.000 APP")
+                ("specification_eta", 1)
+                ("development_cost", "5.000 APP")
+                ("development_eta", 1)
+                ("payments_count", 1)
+                ("payments_interval", 1))));
+
+        ASSERT_SUCCESS(worker->push_action(tspec_author, N(startwork), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("worker", worker_account.to_string())));
+
+        for (int i = 0; i < 5; i++) {
+            ASSERT_SUCCESS(worker->push_action(worker_account, N(poststatus), mvo()
+                ("app_domain", app_domain)
+                ("proposal_id", proposal_id)
+                ("comment_id", comment_id++)
+                ("comment", mvo()
+                    ("text", long_text))));
+        }
+    }
 };
 
 BOOST_AUTO_TEST_SUITE(eosio_worker_tests)
@@ -242,8 +326,7 @@ try
         // revote
         for (size_t i = 0; i < delegates.size(); i++)
         {
-            name &delegate = delegates[i];
-
+            const name& delegate = delegates[i];
             ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
                 ("app_domain", app_domain)
                 ("proposal_id", proposal_id)
@@ -549,6 +632,95 @@ try
 
    auto author_balance = token->get_account(author_account, "3,APP");
    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "15.000 APP"));
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(cancel_work_by_worker, golos_worker_tester)
+try
+{
+    uint64_t proposal_id = 0;
+    const name& proposal_author = members[proposal_id * 3];
+    const name& tspec_author = members[proposal_id * 3 + 1];
+    const name& worker_account = members[proposal_id * 3 + 2];
+
+    add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
+
+    ASSERT_SUCCESS(worker->push_action(worker_account, N(cancelwork), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("initiator", worker_account)));
+
+    BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)), wasm_assert_msg("invalid state for withdraw"));
+
+    auto worker_balance = token->get_account(worker_account, "3,APP");
+    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "10.000 APP"));
+
+    auto author_balance = token->get_account(tspec_author, "3,APP");
+    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "10.000 APP"));
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(cancel_work_by_tspec_author, golos_worker_tester)
+try
+{
+    uint64_t proposal_id = 0;
+    const name& proposal_author = members[proposal_id * 3];
+    const name& tspec_author = members[proposal_id * 3 + 1];
+    const name& worker_account = members[proposal_id * 3 + 2];
+
+    add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
+
+    ASSERT_SUCCESS(worker->push_action(tspec_author, N(cancelwork), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("initiator", tspec_author)));
+
+    BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)), wasm_assert_msg("invalid state for withdraw"));
+
+    auto worker_balance = token->get_account(worker_account, "3,APP");
+    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "10.000 APP"));
+
+    auto author_balance = token->get_account(tspec_author, "3,APP");
+    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "10.000 APP"));
+
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(cancel_work_by_delegates, golos_worker_tester)
+try
+{
+    uint64_t proposal_id = 0;
+    uint64_t comment_id = 0;
+    const name& proposal_author = members[proposal_id * 3];
+    const name& tspec_author = members[proposal_id * 3 + 1];
+    const name& worker_account = members[proposal_id * 3 + 2];
+
+    add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
+
+    for (size_t i = 0; i < delegates.size() / 2 + 1; i++) {
+        const name &delegate = delegates[i];
+        ASSERT_SUCCESS(worker->push_action(delegate, N(reviewwork), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("reviewer", delegate)
+            ("status", 0)
+            ("comment_id", comment_id++)
+            ("comment", mvo()("text", "Lorem Ipsum"))));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)), wasm_assert_msg("invalid state for withdraw"));
+
+    auto worker_balance = token->get_account(worker_account, "3,APP");
+    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "10.000 APP"));
+
+    auto author_balance = token->get_account(tspec_author, "3,APP");
+    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "10.000 APP"));
 }
 FC_LOG_AND_RETHROW()
 
