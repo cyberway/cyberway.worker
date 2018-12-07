@@ -147,16 +147,17 @@ private:
             auto index = votes.template get_index<"foreign"_n>();
             for (auto vote_ptr = index.lower_bound(vote.foreign_id); vote_ptr != index.upper_bound(vote.foreign_id); vote_ptr++) {
                 if (vote_ptr->voter == vote.voter) {
-                    votes.modify(votes.get(vote_ptr->id), vote.voter, [&](auto &obj) {
-                        obj.positive = vote.positive;
-                    });
-
+                    if ((vote_ptr->positive) != vote.positive) {
+                        votes.modify(votes.get(vote_ptr->id), vote.voter, [&](auto &obj) {
+                            obj.positive = vote.positive;
+                        });
+                    }
                     return;
                 }
             }
             votes.emplace(vote.voter, [&](auto &obj) {
                 obj = vote;
-                obj.id = now() ^ vote.voter.value;
+                obj.id = votes.available_primary_key();
             });
         }
     };
