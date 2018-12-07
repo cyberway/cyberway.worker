@@ -657,6 +657,7 @@ public:
         LOG("proposal_id: %, tspec_id: %, author: %", proposal_id, tspec_app_id, ACCOUNT_NAME_CSTR(author));
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for addtspec");
 
         _proposal_tspecs.emplace(author, [&](tspec_app_t &spec) {
             spec.id = tspec_app_id;
@@ -703,6 +704,9 @@ public:
         const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
         eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for deltspec");
+        eosio_assert(_proposal_tspec_votes.count_positive(tspec_app_id) == 0, "upvoted technical specification application can be removed");
+
         require_app_member(tspec_app.author);
 
         eosio_assert(_proposal_tspec_votes.count_positive(tspec_app.foreign_id) == 0,
