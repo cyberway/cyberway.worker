@@ -420,6 +420,12 @@ protected:
         proposal.set_state(proposal_t::STATE_CLOSED);
     }
 
+    void del_tspec(const tspec_app_t &tspec_app) {
+        _proposal_tspec_votes.del_all(tspec_app.id);
+        _proposal_tspec_comments.del_all(tspec_app.id);
+        _proposal_tspecs.erase(tspec_app);
+    }
+
 public:
     worker(eosio::name receiver, eosio::name code, eosio::name app) : contract(receiver, code, eosio::datastream<const char *>(nullptr, 0)),
         _app(app),
@@ -753,7 +759,7 @@ public:
         eosio_assert(_proposal_tspec_votes.count_positive(tspec_app.foreign_id) == 0,
                      "technical specification application can't be deleted because it already has been upvoted"); //Technical Specification 1.e
 
-        _proposal_tspecs.erase(tspec_app);
+        del_tspec(tspec_app);
     }
 
     /**
