@@ -97,11 +97,11 @@ private:
 
         void del_all(uint64_t foreign_id) {
             auto index = comments.template get_index<name("foreign")>();
-            auto comment_ptr = index.lower_bound(foreign_id);
-            while (comment_ptr != index.upper_bound(foreign_id)) {
-                comment_id_t comment_id = comment_ptr->id;
-                comment_ptr++;
-                comments.erase(comments.get(comment_id));
+            auto ptr = index.lower_bound(foreign_id);
+            while (ptr != index.upper_bound(foreign_id)) {
+                comment_id_t id = ptr->id;
+                ptr++;
+                comments.erase(comments.get(id));
             }
         }
     };
@@ -163,6 +163,16 @@ private:
                 obj = vote;
                 obj.id = votes.available_primary_key();
             });
+        }
+
+        void del_all(uint64_t foreign_id) {
+            auto index = votes.template get_index<name("foreign")>();
+            auto ptr = index.lower_bound(foreign_id);
+            while (ptr != index.upper_bound(foreign_id)) {
+                uint64_t id = ptr->id;
+                ptr++;
+                votes.erase(votes.get(id));
+            }
         }
     };
 
@@ -591,6 +601,9 @@ public:
         require_app_member(proposal_ptr->author);
 
         _proposal_comments.del_all(proposal_id);
+        _proposal_review_comments.del_all(proposal_id);
+        _proposal_status_comments.del_all(proposal_id);
+        _proposal_votes.del_all(proposal_id);
 
         _proposals.erase(proposal_ptr);
     }
