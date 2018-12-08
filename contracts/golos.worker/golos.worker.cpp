@@ -56,7 +56,9 @@ private:
 
     template <eosio::name::raw TableName>
     struct comments_module_t {
-        multi_index<TableName, comment_t> comments;
+        multi_index<TableName, comment_t,
+            indexed_by<"foreign"_n,
+                const_mem_fun<comment_t, uint64_t, &comment_t::get_secondary_1>>> comments;
 
         comments_module_t(eosio::name code, uint64_t scope) : comments(code, scope) {}
 
@@ -91,6 +93,16 @@ private:
             comments.modify(comment_ptr, comment_ptr->author, [&](comment_t &obj) {
                 obj.data.text = data.text;
             });
+        }
+
+        void del_all(uint64_t foreign_id) {
+            auto index = comments.template get_index<name("foreign")>();
+            auto comment_ptr = index.lower_bound(foreign_id);
+            while (comment_ptr != index.upper_bound(foreign_id)) {
+                comment_id_t comment_id = comment_ptr->id;
+                comment_ptr++;
+                comments.erase(comments.get(comment_id));
+            }
         }
     };
 
@@ -577,6 +589,9 @@ public:
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
         require_app_member(proposal_ptr->author);
+
+        _proposal_comments.del_all(proposal_id);
+
         _proposals.erase(proposal_ptr);
     }
 
