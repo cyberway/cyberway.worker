@@ -247,7 +247,7 @@ private:
 
         EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(data)(created)(modified));
     };
-    multi_index<"tspecs"_n, tspec_app_t, indexed_by<"index"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>> _proposal_tspecs;
+    multi_index<"tspecs"_n, tspec_app_t, indexed_by<"foreign"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>> _proposal_tspecs;
 
     using proposal_id_t = uint64_t;
     struct [[eosio::table]] proposal_t {
@@ -610,6 +610,12 @@ public:
         _proposal_review_comments.del_all(proposal_id);
         _proposal_status_comments.del_all(proposal_id);
         _proposal_votes.del_all(proposal_id);
+
+        auto tspec_index = _proposal_tspecs.get_index<"foreign"_n>();
+        auto tspec_ptr = tspec_index.lower_bound(proposal_id);
+        while (tspec_ptr != tspec_index.upper_bound(proposal_id)) {
+            del_tspec(*(tspec_ptr++));
+        }
 
         _proposals.erase(proposal_ptr);
     }
