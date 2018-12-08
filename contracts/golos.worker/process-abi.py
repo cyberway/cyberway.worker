@@ -23,13 +23,6 @@ if __name__ == "__main__":
     abi["structs"] = list(filter(lambda x: x is not None,
         [struct if struct["name"] not in ["block_timestamp"] else None for struct in abi["structs"]]))
 
-    # patch set_t
-    for struct in abi["structs"]:
-        for field in struct["fields"]:
-            m = re.match(r"set_t<([a-z_]+)>", field["type"])
-            if m:
-                field["type"] = "%s[]" % m.group(1)
-
     # patch existent types
     for t in abi["types"]:
         if t["new_type_name"] == "symbol_name": # patch for eosjs

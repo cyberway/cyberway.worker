@@ -185,7 +185,7 @@ class golos_worker_tester : public tester
     }
 
     void add_proposal(uint64_t proposal_id, const name& proposal_author, const name& tspec_author, const name& worker_account) {
-        const uint64_t tspec_app_id = proposal_id * 10;
+        const uint64_t tspec_app_id = proposal_id * 100;
         const uint64_t other_tspec_app_id = tspec_app_id + 1;
         uint64_t comment_id = proposal_id  * 100;
 
@@ -200,12 +200,12 @@ class golos_worker_tester : public tester
             ("app_domain", app_domain)
             ("proposal_id", proposal_id)
             ("tspec_app_id", tspec_app_id)
-            ("author", tspec_author.to_string())
+            ("author", tspec_author)
             ("tspec", mvo()
                 ("text", "Technical specification #1")
-                ("specification_cost", "1.000 APP")
+                ("specification_cost", "5.000 APP")
                 ("specification_eta", 1)
-                ("development_cost", "1.000 APP")
+                ("development_cost", "5.000 APP")
                 ("development_eta", 1)
                 ("payments_count", 1)
                 ("payments_interval", 1))));
@@ -216,9 +216,9 @@ class golos_worker_tester : public tester
             ("tspec_app_id", other_tspec_app_id)
             ("author", tspec_author)
             ("tspec", mvo()("text", "Technical specification #2")
-                ("specification_cost", "2.000 APP")
+                ("specification_cost", "5.000 APP")
                 ("specification_eta", 1)
-                ("development_cost", "2.000 APP")
+                ("development_cost", "5.000 APP")
                 ("development_eta", 1)
                 ("payments_count", 2)
                 ("payments_interval", 1))));
@@ -241,7 +241,7 @@ class golos_worker_tester : public tester
         /* ok,technical specification application has been choosen,
         now technical specification application author should publish
         a final technical specification */
-        ASSERT_SUCCESS(worker->push_action(tspec_author, N(publishtspec), mvo()
+        BOOST_REQUIRE_EQUAL(worker->push_action(tspec_author, N(publishtspec), mvo()
             ("app_domain", app_domain)
             ("proposal_id", proposal_id)
             ("data", mvo()
@@ -251,12 +251,24 @@ class golos_worker_tester : public tester
                 ("development_cost", "5.000 APP")
                 ("development_eta", 1)
                 ("payments_count", 1)
+                ("payments_interval", 1))), wasm_assert_msg("cost can't be modified"));
+
+        ASSERT_SUCCESS(worker->push_action(tspec_author, N(publishtspec), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("data", mvo()
+                ("text", long_text)
+                ("specification_cost", "0.000 APP")
+                ("specification_eta", 1)
+                ("development_cost", "0.000 APP")
+                ("development_eta", 1)
+                ("payments_count", 1)
                 ("payments_interval", 1))));
 
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(startwork), mvo()
             ("app_domain", app_domain)
             ("proposal_id", proposal_id)
-            ("worker", worker_account.to_string())));
+            ("worker", worker_account)));
 
         for (int i = 0; i < 5; i++) {
             ASSERT_SUCCESS(worker->push_action(worker_account, N(poststatus), mvo()
@@ -274,10 +286,28 @@ BOOST_AUTO_TEST_SUITE(eosio_worker_tests)
 BOOST_FIXTURE_TEST_CASE(proposal_CUD, golos_worker_tester)
 try
 {
-    ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()("app_domain", app_domain)("proposal_id", 0)("author", members[0])("title", "Proposal #1")("description", "Description #1")));
-    ASSERT_SUCCESS(worker->push_action(members[0], N(editpropos), mvo()("app_domain", app_domain)("proposal_id", 0)("title", "New Proposal #1")("description", "")));
-    ASSERT_SUCCESS(worker->push_action(members[0], N(editpropos), mvo()("app_domain", app_domain)("proposal_id", 0)("title", "")("description", "")));
-    ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()("app_domain", app_domain)("proposal_id", 0)));
+    ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 0)
+        ("author", members[0])
+        ("title", "Proposal #1")
+        ("description", "Description #1")));
+
+    ASSERT_SUCCESS(worker->push_action(members[0], N(editpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 0)
+        ("title", "New Proposal #1")
+        ("description", "")));
+
+    BOOST_REQUIRE_EQUAL(worker->push_action(members[0], N(editpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 0)
+        ("title", "")
+        ("description", "")), wasm_assert_msg("invalid arguments"));
+
+    ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 0)));
 }
 FC_LOG_AND_RETHROW()
 
@@ -373,7 +403,6 @@ try
             ("comment", mvo()
                 ("text", long_text))));
 
-
         for (size_t i = 0; i < delegates.size(); i++) {
             const name &delegate = delegates[i];
             ASSERT_SUCCESS(worker->push_action(delegate, N(reviewwork), mvo()
@@ -417,14 +446,14 @@ try
     ASSERT_SUCCESS(worker->push_action(sponsor_account, N(setfund), mvo()
         ("app_domain", app_domain)
         ("proposal_id", proposal_id)
-        ("fund_name", sponsor_account.to_string())
+        ("fund_name", sponsor_account)
         ("quantity", "10.000 APP")));
 
     ASSERT_SUCCESS(worker->push_action(author_account, N(addtspec), mvo()
         ("app_domain", app_domain)
         ("proposal_id", proposal_id)
         ("tspec_app_id", 1)
-        ("author", author_account.to_string())
+        ("author", author_account)
         ("tspec", mvo()
             ("text", "Technical specification #1")
             ("specification_cost", "5.000 APP")
@@ -434,11 +463,11 @@ try
             ("payments_count", 1)
             ("payments_interval", 1))));
 
-    ASSERT_SUCCESS(worker->push_action(members[3], N(addtspec), mvo()
+    ASSERT_SUCCESS(worker->push_action(author_account, N(addtspec), mvo()
         ("app_domain", app_domain)
         ("proposal_id", 1)
         ("tspec_app_id", 2)
-        ("author", members[3].to_string())
+        ("author", author_account)
         ("tspec", mvo()("text", "Technical specification #2")
             ("specification_cost", "2.000 APP")
             ("specification_eta", 1)
@@ -456,7 +485,7 @@ try
             ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()
                 ("app_domain", app_domain)
                 ("tspec_app_id", tspec_app_id)
-                ("author", account.to_string())
+                ("author", account)
                 ("vote", (i + 1) % 2)
                 ("comment_id", 100 + i)
                 ("comment", mvo()("text", "Lorem Ipsum"))));
@@ -472,9 +501,9 @@ try
         ("proposal_id", proposal_id)
         ("data", mvo()
             ("text", long_text)
-            ("specification_cost", "5.000 APP")
+            ("specification_cost", "0.000 APP")
             ("specification_eta", 1)
-            ("development_cost", "5.000 APP")
+            ("development_cost", "0.000 APP")
             ("development_eta", 1)
             ("payments_count", 1)
             ("payments_interval", 1))));
@@ -545,7 +574,7 @@ try
         ("worker", worker_account)
         ("title", "Sponsored proposal #1")
         ("description", "Description #1")
-        ("specification", mvo()
+        ("tspec", mvo()
             ("text", long_text)
             ("specification_cost", "5.000 APP")
             ("specification_eta", 1)
@@ -651,7 +680,7 @@ try
 
     add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
 
-    for (size_t i = 0; i < delegates.size() / 2 + 1; i++) {
+    for (size_t i = 0; i < delegates.size() * 3 / 4 + 1; i++) {
         const name &delegate = delegates[i];
         ASSERT_SUCCESS(worker->push_action(delegate, N(reviewwork), mvo()
             ("app_domain", app_domain)

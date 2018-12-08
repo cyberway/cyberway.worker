@@ -7,15 +7,12 @@
 #include <eosiolib/symbol.hpp>
 #include <eosiolib/name.hpp>
 #include <eosiolib/serialize.hpp>
-#include <algorithm>
 
+#include <algorithm>
 #include <string>
 #include <vector>
-#include <algorithm>
 
 #include "external.hpp"
-#include "structs.hpp"
-
 #include "app_dispatcher.hpp"
 
 using namespace eosio;
@@ -39,14 +36,12 @@ private:
     static constexpr uint32_t voting_time_s = 7 * 24 * 3600;
 
     using comment_id_t = uint64_t;
-    struct comment_data_t
-    {
+    struct comment_data_t {
         string text;
 
         EOSLIB_SERIALIZE(comment_data_t, (text));
     };
-    struct [[eosio::table]] comment_t
-    {
+    struct [[eosio::table]] comment_t {
         comment_id_t id;
         uint64_t foreign_id;
         eosio::name author;
@@ -60,8 +55,7 @@ private:
     };
 
     template <eosio::name::raw TableName>
-    struct comments_module_t
-    {
+    struct comments_module_t {
         multi_index<TableName, comment_t> comments;
 
         comments_module_t(eosio::name code, uint64_t scope) : comments(code, scope) {}
@@ -100,8 +94,7 @@ private:
         }
     };
 
-    struct [[eosio::table]] vote_t
-    {
+    struct [[eosio::table]] vote_t {
         uint64_t id;
         name voter;
         uint64_t foreign_id;
@@ -114,8 +107,7 @@ private:
     };
 
     template <eosio::name::raw TableName>
-    struct voting_module_t
-    {
+    struct voting_module_t {
         multi_index<TableName, vote_t, indexed_by<"foreign"_n, const_mem_fun<vote_t, uint64_t, &vote_t::get_secondary_1>>> votes;
 
         voting_module_t(eosio::name code, uint64_t scope) : votes(code, scope) {}
@@ -163,8 +155,7 @@ private:
     };
 
     typedef uint64_t tspec_id_t;
-    struct tspec_data_t
-    {
+    struct tspec_data_t {
         string text;
         asset specification_cost;
         uint32_t specification_eta;
@@ -175,40 +166,46 @@ private:
 
         EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count)(payments_interval));
 
-        void update(const tspec_data_t &that)
+        void update(const tspec_data_t &that, bool limited)
         {
-            if (!that.text.empty())
-            {
+            bool modified = false;
+
+            if (!that.text.empty()) {
                 text = that.text;
+                modified = true;
             }
-            if (that.specification_cost.amount != 0)
-            {
+
+            if (that.specification_cost.amount != 0) {
+                eosio_assert(!limited, "cost can't be modified");
                 specification_cost = that.specification_cost;
+                modified = true;
             }
 
-            if (that.specification_eta != 0)
-            {
+            if (that.specification_eta != 0) {
                 specification_eta = that.specification_eta;
+                modified = true;
             }
 
-            if (that.development_cost.amount != 0)
-            {
+            if (that.development_cost.amount != 0) {
+                eosio_assert(!limited, "cost can be modified");
                 development_cost = that.development_cost;
+                modified = true;
             }
 
-            if (that.development_eta != 0)
-            {
+            if (that.development_eta != 0) {
                 development_eta = that.development_eta;
+                modified = true;
             }
 
-            if (that.payments_count != 0)
-            {
+            if (that.payments_count != 0) {
                 payments_count = that.payments_count;
+                modified = true;
             }
+
+            eosio_assert(modified, "nothing to modify");
         }
     };
-    struct [[eosio::table]] tspec_app_t
-    {
+    struct [[eosio::table]] tspec_app_t {
         tspec_id_t id;
         tspec_id_t foreign_id;
 
@@ -218,9 +215,8 @@ private:
         block_timestamp created;
         block_timestamp modified;
 
-        void modify(const tspec_data_t &that)
-        {
-            data.update(that);
+        void modify(const tspec_data_t &that, bool limited = false) {
+            data.update(that, limited);
             modified = TIMESTAMP_NOW;
         }
 
@@ -232,10 +228,8 @@ private:
     multi_index<"tspecs"_n, tspec_app_t, indexed_by<"index"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>> _proposal_tspecs;
 
     using proposal_id_t = uint64_t;
-    struct [[eosio::table]] proposal_t
-    {
-        enum state_t
-        {
+    struct [[eosio::table]] proposal_t {
+        enum state_t {
             STATE_TSPEC_APP = 1,
             STATE_TSPEC_CREATE,
             STATE_WORK,
@@ -244,14 +238,12 @@ private:
             STATE_CLOSED
         };
 
-        enum review_status_t
-        {
+        enum review_status_t {
             STATUS_REJECT = 0,
             STATUS_ACCEPT = 1
         };
 
-        enum type_t
-        {
+        enum type_t {
             TYPE_1,
             TYPE_2
         };
@@ -263,10 +255,7 @@ private:
         string description;
         eosio::name fund_name;
         asset deposit;
-        ///< technical specification author
-        eosio::name tspec_author;
-        ///< technical specification data
-        tspec_data_t tspec;
+        tspec_id_t tspec_id;
         ///< perpetrator account name
         eosio::name worker;
         block_timestamp work_begining_time;
@@ -276,22 +265,20 @@ private:
         block_timestamp modified;
         uint8_t state;
 
-        EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(title)(description)(fund_name)(deposit)(tspec_author)(tspec)(worker)(work_begining_time)(worker_payments_count)(created)(modified)(state));
+        EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(title)(description)(fund_name)(deposit)(tspec_id)(worker)(work_begining_time)(worker_payments_count)(created)(modified)(state));
 
         uint64_t primary_key() const { return id; }
         void set_state(state_t new_state) { state = new_state; }
     };
     multi_index<"proposals"_n, proposal_t> _proposals;
 
-    struct [[eosio::table("state")]] state_t
-    {
+    struct [[eosio::table("state")]] state_t {
         eosio::symbol token_symbol;
         EOSLIB_SERIALIZE(state_t, (token_symbol));
     };
     singleton<"state"_n, state_t> _state;
 
-    struct [[eosio::table]] fund_t
-    {
+    struct [[eosio::table]] fund_t {
         eosio::name owner;
         asset quantity;
 
@@ -306,7 +293,7 @@ private:
     voting_module_t<"proposalstsv"_n> _proposal_tspec_votes;
     comments_module_t<"tspecappc"_n> _proposal_tspec_comments;
     comments_module_t<"statusc"_n> _proposal_status_comments;
-    comments_module_t<"reviewc"_n> _proposal_reivew_comments;
+    comments_module_t<"reviewc"_n> _proposal_review_comments;
     voting_module_t<"proposalsrv"_n> _proposal_review_votes;
 
     eosio::name _app;
@@ -344,7 +331,8 @@ protected:
     }
 
     void deposit(proposal_t &proposal, const name &modifier) {
-        const asset budget = proposal.tspec.development_cost + proposal.tspec.specification_cost;
+        const tspec_data_t &tspec = _proposal_tspecs.get(proposal.tspec_id).data;
+        const asset budget = tspec.development_cost + tspec.specification_cost;
         auto fund = _funds.find(proposal.fund_name.value);
         eosio_assert(fund != _funds.end(), "fund doesn't exist");
         LOG("proposal.id: %, budget: %, fund: %", proposal.id, budget, proposal.fund_name);
@@ -359,9 +347,9 @@ protected:
     void choose_proposal_tspec(proposal_t & proposal, const tspec_app_t &tspec_app, eosio::name modifier)
     {
         eosio_assert(proposal.type == proposal_t::TYPE_1, "invalid state for choose_proposal_tspec");
-        proposal.tspec_author = tspec_app.author;
-        proposal.tspec = tspec_app.data;
+        proposal.tspec_id = tspec_app.id;
         proposal.set_state(proposal_t::STATE_TSPEC_CREATE);
+
         // funds can be deposited in setfund(), if not, it will be deposited here
         if (proposal.deposit.amount == 0)
         {
@@ -371,14 +359,17 @@ protected:
 
     void pay_tspec_author(proposal_t & proposal)
     {
-        LOG("paying % to %", proposal.tspec.specification_cost, ACCOUNT_NAME_CSTR(proposal.tspec_author));
-        proposal.deposit -= proposal.tspec.specification_cost;
+        const tspec_app_t& tspec_app = _proposal_tspecs.get(proposal.tspec_id);
+        const tspec_data_t& tspec = tspec_app.data;
+
+        LOG("paying % to %", tspec.specification_cost, ACCOUNT_NAME_CSTR(tspec_app.author));
+        proposal.deposit -= tspec.specification_cost;
 
         action(permission_level{_self, "active"_n},
                TOKEN_ACCOUNT,
                "transfer"_n,
-               std::make_tuple(_self, proposal.tspec_author,
-                               proposal.tspec.specification_cost,
+               std::make_tuple(_self, tspec_app.author,
+                               tspec.specification_cost,
                                std::string("technical specification reward")))
                 .send();
     }
@@ -416,7 +407,7 @@ public:
         _proposal_comments(_self, app.value),
         _proposal_votes(_self, app.value),
         _proposal_status_comments(_self, app.value),
-        _proposal_reivew_comments(_self, app.value),
+        _proposal_review_comments(_self, app.value),
         _proposal_review_votes(_self, app.value),
         _proposal_tspecs(_self, app.value),
         _proposal_tspec_comments(_self, app.value),
@@ -456,10 +447,11 @@ public:
             o.author = author;
             o.title = title;
             o.description = description;
+            o.fund_name = _app;
+
+            o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
             o.created = TIMESTAMP_NOW;
             o.modified = TIMESTAMP_UNDEFINED;
-            o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
-            o.fund_name = _app;
         });
         LOG("added");
     }
@@ -479,7 +471,7 @@ public:
                const eosio::name &worker,
                const string &title,
                const string &description,
-               const tspec_data_t &specification,
+               const tspec_data_t &tspec,
                const comment_id_t comment_id,
                const comment_data_t &comment)
     {
@@ -487,16 +479,17 @@ public:
 
         LOG("adding propos % \"%\" by %, worker: %", proposal_id, title.c_str(), ACCOUNT_NAME_CSTR(author), ACCOUNT_NAME_CSTR(worker));
 
+        tspec_id_t tspec_id = _proposal_tspecs.available_primary_key();
+
         _proposals.emplace(author, [&](proposal_t &o) {
             o.id = proposal_id;
             o.type = proposal_t::TYPE_2;
             o.author = author;
             o.title = title;
             o.description = description;
-            o.tspec = specification;
             o.fund_name = _app;
+            o.tspec_id = tspec_id;
             o.worker = worker;
-            o.tspec_author = author;
             o.work_begining_time = TIMESTAMP_NOW;
             o.worker_payments_count = 0;
 
@@ -504,6 +497,15 @@ public:
             o.modified = TIMESTAMP_UNDEFINED;
 
            o.set_state(proposal_t::STATE_DELEGATES_REVIEW);
+        });
+
+        _proposal_tspecs.emplace(author, [&](tspec_app_t &obj) {
+            obj.id = tspec_id;
+            obj.foreign_id = proposal_id;
+            obj.author = author;
+            obj.data = tspec;
+            obj.created = TIMESTAMP_NOW;
+            obj.modified = TIMESTAMP_UNDEFINED;
         });
 
         _proposal_status_comments.add(comment_id, proposal_id, author, comment);
@@ -549,22 +551,15 @@ public:
         auto proposal_ptr = get_proposal(proposal_id);
         require_app_member(proposal_ptr->author);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for editpropos");
+        eosio_assert(!(description.empty() && title.empty()), "invalid arguments");
 
         _proposals.modify(proposal_ptr, proposal_ptr->author, [&](auto &o) {
-            bool modified = false;
-            if (!description.empty())
-            {
+            if (!description.empty()) {
                 o.description = description;
-                modified = true;
+                o.modified = block_timestamp(now());
             }
-            if (!title.empty())
-            {
+            if (!title.empty()) {
                 o.title = title;
-                modified = true;
-            }
-
-            if (modified)
-            {
                 o.modified = block_timestamp(now());
             }
         });
@@ -616,6 +611,9 @@ public:
      */
     [[eosio::action]]
     void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, eosio::name author, const comment_data_t &data) {
+        const proposal_t &proposal = _proposals.get(proposal_id);
+        eosio_assert(proposal.state != proposal_t::STATE_CLOSED, "invalid state for addcomment");
+
         LOG("proposal_id: %, comment_id: %, author: %", proposal_id, comment_id, ACCOUNT_NAME_CSTR(author));
         _proposal_comments.add(comment_id, proposal_id, author, data);
     }
@@ -630,6 +628,11 @@ public:
     void editcomment(comment_id_t comment_id, const comment_data_t &data)
     {
         LOG("comment_id: %", comment_id);
+
+        const proposal_id_t proposal_id = _proposal_comments.comments.get(comment_id).foreign_id;
+        const proposal_t& proposal = _proposals.get(proposal_id);
+        eosio_assert(proposal.state != proposal_t::STATE_CLOSED, "invalid state for addcomment");
+
         _proposal_comments.edit(comment_id, data);
     }
 
@@ -641,6 +644,11 @@ public:
     [[eosio::action]]
     void delcomment(comment_id_t comment_id) {
         LOG("comment_id: %", comment_id);
+
+        const proposal_id_t proposal_id = _proposal_comments.comments.get(comment_id).foreign_id;
+        const proposal_t &proposal = _proposals.get(proposal_id);
+        eosio_assert(proposal.state != proposal_t::STATE_CLOSED, "invalid state for addcomment");
+
         _proposal_comments.del(comment_id);
     }
 
@@ -659,13 +667,16 @@ public:
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for addtspec");
 
+        eosio_assert(get_state().token_symbol == tspec.specification_cost.symbol, "invalid symbol for the specification cost");
+        eosio_assert(get_state().token_symbol == tspec.development_cost.symbol, "invalid symbol for the development cost");
+
         _proposal_tspecs.emplace(author, [&](tspec_app_t &spec) {
             spec.id = tspec_app_id;
             spec.author = author;
-            spec.created = TIMESTAMP_NOW;
-            spec.modified = TIMESTAMP_UNDEFINED;
             spec.data = tspec;
             spec.foreign_id = proposal_id;
+            spec.created = TIMESTAMP_NOW;
+            spec.modified = TIMESTAMP_UNDEFINED;
         });
     }
 
@@ -684,10 +695,12 @@ public:
 
         eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for edittspec");
         eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
-        eosio_assert(tspec.specification_cost.symbol == get_state().token_symbol, "invalid token symbol");
-        eosio_assert(tspec.development_cost.symbol == get_state().token_symbol, "invalid token symbol");
+
+        eosio_assert(get_state().token_symbol == tspec.specification_cost.symbol, "invalid symbol for the specification cost");
+        eosio_assert(get_state().token_symbol == tspec.development_cost.symbol, "invalid symbol for the development cost");
 
         require_app_member(tspec_app.author);
+
         _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t &obj) {
             obj.modify(tspec);
         });
@@ -774,10 +787,13 @@ public:
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_CREATE, "invalid state for publishtspec");
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
-        require_auth(proposal_ptr->tspec_author);
 
-        _proposals.modify(proposal_ptr, proposal_ptr->tspec_author, [&](proposal_t &proposal) {
-            proposal.tspec.update(data);
+        const tspec_app_t& tspec_app = _proposal_tspecs.get(proposal_ptr->tspec_id);
+        LOG("tspec_app.id: %, tspec_app.author: %", tspec_app.id, tspec_app.author);
+        require_auth(tspec_app.author);
+
+        _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t &obj) {
+            obj.data.update(data, true /* limited */);
         });
     }
 
@@ -792,9 +808,11 @@ public:
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_CREATE, "invalid state for startwork");
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
-        require_auth(proposal_ptr->tspec_author);
 
-        _proposals.modify(proposal_ptr, proposal_ptr->tspec_author, [&](proposal_t &proposal) {
+        const tspec_app_t& tspec_app = _proposal_tspecs.get(proposal_ptr->tspec_id);
+        require_auth(tspec_app.author);
+
+        _proposals.modify(proposal_ptr, tspec_app.author, [&](proposal_t &proposal) {
             proposal.worker = worker;
             proposal.work_begining_time = TIMESTAMP_NOW;
             proposal.set_state(proposal_t::STATE_WORK);
@@ -820,11 +838,13 @@ public:
         }
         else
         {
-            require_auth(proposal_ptr->tspec_author);
+            const tspec_app_t& tspec_app = _proposal_tspecs.get(proposal_ptr->tspec_id);
+            require_auth(tspec_app.author);
         }
 
         _proposals.modify(proposal_ptr, initiator, [&](proposal_t &proposal) {
             refund(proposal, initiator);
+            close(proposal);
         });
     }
 
@@ -857,13 +877,15 @@ public:
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid state for acceptwork");
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
-        require_auth(proposal_ptr->tspec_author);
 
-        _proposals.modify(proposal_ptr, proposal_ptr->tspec_author, [&](auto &proposal) {
+        const tspec_app_t& tspec_app = _proposal_tspecs.get(proposal_ptr->tspec_id);
+        require_auth(tspec_app.author);
+
+        _proposals.modify(proposal_ptr, tspec_app.author, [&](auto &proposal) {
             proposal.set_state(proposal_t::STATE_DELEGATES_REVIEW);
         });
 
-        _proposal_status_comments.add(comment_id, proposal_ptr->id, proposal_ptr->tspec_author, comment);
+        _proposal_status_comments.add(comment_id, proposal_ptr->id, tspec_app.author, comment);
     }
 
     /**
@@ -944,34 +966,39 @@ public:
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_PAYMENT, "invalid state for withdraw");
 
+        const tspec_app_t& tspec_app = _proposal_tspecs.get(proposal_ptr->tspec_id);
+        const tspec_data_t& tspec = tspec_app.data;
+
+        require_auth(proposal_ptr->worker);
+
         LOG("proposal.worker: %, payments_count: %, payments_interval: %", proposal_ptr->worker,
-            static_cast<int>(proposal_ptr->tspec.payments_count),
-            static_cast<int>(proposal_ptr->tspec.payments_interval));
+            static_cast<int>(tspec.payments_count),
+            static_cast<int>(tspec.payments_interval));
 
         require_auth(proposal_ptr->worker);
 
         asset quantity;
 
-        if (proposal_ptr->tspec.payments_count == 1)
+        if (tspec.payments_count == 1)
         {
-            quantity = proposal_ptr->tspec.development_cost;
+            quantity = tspec.development_cost;
         }
         else
         {
             const uint32_t payment_epoch = (now() - proposal_ptr->payment_begining_time.to_time_point().sec_since_epoch())
-                / proposal_ptr->tspec.payments_interval;
+                / tspec.payments_interval;
 
             LOG("payment epoch: %, interval: %s, worker payments: %",
-                payment_epoch, proposal_ptr->tspec.payments_interval,
+                payment_epoch, tspec.payments_interval,
                 int(proposal_ptr->worker_payments_count));
 
             eosio_assert(payment_epoch > proposal_ptr->worker_payments_count, "can't withdraw right now");
 
-            quantity = proposal_ptr->tspec.development_cost / proposal_ptr->tspec.payments_count;
+            quantity = tspec.development_cost / tspec.payments_count;
 
-            if (proposal_ptr->worker_payments_count + 1 == proposal_ptr->tspec.payments_count)
+            if (proposal_ptr->worker_payments_count + 1 == tspec.payments_count)
             {
-                quantity += asset(proposal_ptr->tspec.development_cost.amount % proposal_ptr->tspec.payments_count, quantity.symbol);
+                quantity += asset(tspec.development_cost.amount % tspec.payments_count, quantity.symbol);
             }
         }
 
@@ -979,7 +1006,7 @@ public:
             proposal.deposit -= quantity;
             proposal.worker_payments_count += 1;
 
-            if (proposal.worker_payments_count == proposal.tspec.payments_count)
+            if (proposal.worker_payments_count == tspec.payments_count)
             {
                 close(proposal);
             }
