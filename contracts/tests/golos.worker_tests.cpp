@@ -139,6 +139,10 @@ class worker_contract : public base_contract
     fc::variant get_tspec(name scope, uint64_t id) {
         return base_contract::get_table_row(N(tspecs), "tspec_app_t", scope, id);
     }
+
+    fc::variant get_proposal_comment(name scope, uint64_t id) {
+        return base_contract::get_table_row(N(proposalsc), "comment_t", scope, id);
+    }
 };
 
 class golos_worker_tester : public tester
@@ -344,31 +348,57 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(comment_CUD, golos_worker_tester)
 try
 {
+    const uint64_t proposal_id = 0;
+
     ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
         ("app_domain", app_domain)
-        ("proposal_id", 0)
+        ("proposal_id", proposal_id)
         ("author", members[0])
         ("title", "Proposal #1")
         ("description", "Description #1")));
-    ASSERT_SUCCESS(worker->push_action(members[1], N(addcomment), mvo()
-        ("app_domain", app_domain)
-        ("proposal_id", 0)
-        ("comment_id", 0)
-        ("author", members[1])
-        ("data", mvo()
-            ("text", "Awesome!"))));
-    ASSERT_SUCCESS(worker->push_action(members[1], N(editcomment), mvo()
-        ("app_domain", app_domain)
-        ("proposal_id", 0)
-        ("comment_id", 0)
-        ("data", mvo()
-        ("text", "Awesome!"))));
-    ASSERT_SUCCESS(worker->push_action(members[1], N(delcomment), mvo()
-        ("app_domain", app_domain)
-        ("comment_id", 0)));
+
+    constexpr uint64_t comments_count = 10;
+
+    for (uint64_t i = 0; i < comments_count; i++) {
+        const uint64_t comment_id = i;
+        const name& comment_author = members[i];
+
+        ASSERT_SUCCESS(worker->push_action(comment_author, N(addcomment), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("comment_id", comment_id)
+            ("author", comment_author)
+            ("data", mvo()
+                ("text", "Awesome!"))));
+
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_comment(name(app_domain), comment_id)["data"]["text"].as_string(), "Awesome!");
+
+        ASSERT_SUCCESS(worker->push_action(comment_author, N(editcomment), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("comment_id", comment_id)
+            ("data", mvo()
+                ("text", "Fine!"))));
+
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_comment(name(app_domain), comment_id)["data"]["text"].as_string(), "Fine!");
+    }
+
+    for (uint64_t i = 0; i < comments_count; i++) {
+        const uint64_t comment_id = i;
+        const name& comment_author = members[i];
+
+        ASSERT_SUCCESS(worker->push_action(comment_author, N(delcomment), mvo()
+            ("app_domain", app_domain)
+            ("comment_id", comment_id)));
+
+        BOOST_REQUIRE(worker->get_proposal_comment(name(app_domain), comment_id).is_null());
+    }
+
     ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
         ("app_domain", app_domain)
-        ("proposal_id", 0)));
+        ("proposal_id", proposal_id)));
+
+    BOOST_REQUIRE(worker->get_proposal(name(app_domain), proposal_id).is_null());
 }
 FC_LOG_AND_RETHROW()
 
