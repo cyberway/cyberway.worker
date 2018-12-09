@@ -137,7 +137,7 @@ class worker_contract : public base_contract
     }
 
     fc::variant get_tspec(name scope, uint64_t id) {
-        return base_contract::get_table_row(N(tspecs), "tspec_data_t", scope, id);
+        return base_contract::get_table_row(N(tspecs), "tspec_app_t", scope, id);
     }
 };
 
@@ -375,50 +375,73 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(technical_specification_application_CUD, golos_worker_tester)
 try
 {
-    const uint64_t proposal_id = 0;
-    const uint64_t tspec_app_id = 0;
-    const name& proposal_author = members[0];
-    const name& tspec_author = members[1];
+    for (uint64_t i = 0; i < 10; i++) {
+        const uint64_t proposal_id = i;
+        const name& proposal_author = members[i * 2];
+        const name& tspec_author = members[i * 2 + 1];
 
-    ASSERT_SUCCESS(worker->push_action(proposal_author, N(addpropos), mvo()
-        ("app_domain", app_domain)
-        ("proposal_id", proposal_id)
-        ("author", proposal_author)
-        ("title", "Proposal #1")
-        ("description", "Description #1"))
-    );
+        ASSERT_SUCCESS(worker->push_action(proposal_author, N(addpropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("author", proposal_author)
+            ("title", "Proposal #1")
+            ("description", "Description #1"))
+        );
 
-    ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
-        ("app_domain", app_domain)
-        ("proposal_id", proposal_id)
-        ("tspec_app_id", tspec_app_id)
-        ("author", tspec_author)
-        ("tspec", mvo()
-            ("text", "Technical specification #1")
-            ("specification_cost", "1.000 APP")
-            ("specification_eta", 1)
-            ("development_cost", "1.000 APP")
-            ("development_eta", 1)
-            ("payments_count", 1)
-            ("payments_interval", 1))));
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_APP);
 
-    ASSERT_SUCCESS(worker->push_action(tspec_author, N(edittspec), mvo()
-        ("app_domain", app_domain)
-        ("tspec_app_id", tspec_app_id)
-        ("tspec", mvo()
-            ("text", "Technical specification #1")
-            ("specification_cost", "2.000 APP")
-            ("specification_eta", 2)
-            ("development_cost", "2.000 APP")
-            ("development_eta", 2)
-            ("payments_count", 2)
-            ("payments_interval", 2))));
+        for (uint64_t j = 0; j < 1; j++) {
+            const uint64_t tspec_app_id = 100 * i + j;
 
-    ASSERT_SUCCESS(worker->push_action(tspec_author, N(deltspec), mvo()
-        ("app_domain", app_domain)
-        ("tspec_app_id", tspec_app_id)));
+            auto tspec_app = mvo()
+                ("app_domain", app_domain)
+                ("proposal_id", proposal_id)
+                ("tspec_app_id", tspec_app_id)
+                ("author", tspec_author)
+                ("tspec", mvo()
+                    ("text", "Technical specification")
+                    ("specification_cost", "1.000 APP")
+                    ("specification_eta", 1)
+                    ("development_cost", "1.000 APP")
+                    ("development_eta", 1)
+                    ("payments_count", 1)
+                    ("payments_interval", 1));
 
-    ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()("app_domain", app_domain)("proposal_id", 0)));
+            ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), tspec_app));
+
+            auto tspec_row = worker->get_tspec(name(app_domain), tspec_app_id);
+            BOOST_REQUIRE_EQUAL(tspec_row["id"].as_int64(), tspec_app_id);
+            REQUIRE_MATCHING_OBJECT(tspec_row["data"], tspec_app["tspec"]);
+
+            ASSERT_SUCCESS(worker->push_action(tspec_author, N(edittspec), mvo()
+                ("app_domain", app_domain)
+                ("tspec_app_id", tspec_app_id)
+                ("tspec", mvo()
+                    ("text", "Technical specification")
+                    ("specification_cost", "2.000 APP")
+                    ("specification_eta", 2)
+                    ("development_cost", "2.000 APP")
+                    ("development_eta", 2)
+                    ("payments_count", 2)
+                    ("payments_interval", 2))));
+
+            tspec_row = worker->get_tspec(name(app_domain), tspec_app_id);
+            BOOST_REQUIRE_EQUAL(tspec_row["data"]["specification_cost"].as_string(), "2.000 APP");
+            BOOST_REQUIRE_EQUAL(tspec_row["data"]["development_cost"].as_string(), "2.000 APP");
+
+            ASSERT_SUCCESS(worker->push_action(tspec_author, N(deltspec), mvo()
+                ("app_domain", app_domain)
+                ("tspec_app_id", tspec_app_id)));
+
+            BOOST_REQUIRE(worker->get_tspec(name(app_domain), tspec_app_id).is_null());
+        }
+
+        ASSERT_SUCCESS(worker->push_action(proposal_author, N(delpropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)));
+
+        BOOST_REQUIRE(worker->get_proposal(name(app_domain), proposal_id).is_null());
+    }
 }
 FC_LOG_AND_RETHROW()
 

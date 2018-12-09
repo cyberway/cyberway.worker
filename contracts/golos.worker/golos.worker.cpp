@@ -30,7 +30,7 @@ using namespace std;
 
 namespace golos
 {
-class[[eosio::contract]] worker : public contract
+class [[eosio::contract]] worker : public contract
 {
 private:
     static constexpr uint32_t voting_time_s = 7 * 24 * 3600;
@@ -48,10 +48,11 @@ private:
         comment_data_t data;
         block_timestamp created;
         block_timestamp modified;
-        uint64_t primary_key() const { return id; }
-        uint64_t get_secondary_1() const { return foreign_id; }
 
         EOSLIB_SERIALIZE(comment_t, (id)(foreign_id)(author)(data)(created)(modified));
+
+        uint64_t primary_key() const { return id; }
+        uint64_t get_secondary_1() const { return foreign_id; }
     };
 
     template <eosio::name::raw TableName>
@@ -124,30 +125,26 @@ private:
 
         voting_module_t(eosio::name code, uint64_t scope) : votes(code, scope) {}
 
-        size_t count_positive(uint64_t foreign_id) const
-        {
+        size_t count_positive(uint64_t foreign_id) const {
             auto index = votes.template get_index<name("foreign")>();
             return std::count_if(index.lower_bound(foreign_id), index.upper_bound(foreign_id), [&](const vote_t &vote) {
                 return vote.positive;
             });
         }
 
-        size_t count_negative(uint64_t foreign_id) const
-        {
+        size_t count_negative(uint64_t foreign_id) const {
             auto index = votes.template get_index<"foreign"_n>();
             return std::count_if(index.lower_bound(foreign_id), index.upper_bound(foreign_id), [&](const vote_t &vote) {
                 return !vote.positive;
             });
         }
 
-        size_t count(uint64_t foreign_id) const
-        {
+        size_t count(uint64_t foreign_id) const {
             auto index = votes.template get_index<"foreign"_n>();
             return (size_t)index.upper_bound(foreign_id) - index.lower_bound(foreign_id) + 1;
         }
 
-        void vote(const vote_t &vote)
-        {
+        void vote(const vote_t &vote) {
             auto index = votes.template get_index<"foreign"_n>();
             for (auto vote_ptr = index.lower_bound(vote.foreign_id); vote_ptr != index.upper_bound(vote.foreign_id); vote_ptr++) {
                 if (vote_ptr->voter == vote.voter) {
@@ -186,10 +183,12 @@ private:
         uint8_t payments_count;
         uint32_t payments_interval;
 
-        EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count)(payments_interval));
+        EOSLIB_SERIALIZE(tspec_data_t, (text) \
+            (specification_cost)(specification_eta) \
+            (development_cost)(development_eta) \
+            (payments_count)(payments_interval));
 
-        void update(const tspec_data_t &that, bool limited)
-        {
+        void update(const tspec_data_t &that, bool limited) {
             bool modified = false;
 
             if (!that.text.empty()) {
@@ -227,15 +226,16 @@ private:
             eosio_assert(modified, "nothing to modify");
         }
     };
+
     struct [[eosio::table]] tspec_app_t {
         tspec_id_t id;
         tspec_id_t foreign_id;
-
         eosio::name author;
         tspec_data_t data;
-
         block_timestamp created;
         block_timestamp modified;
+
+        EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(data)(created)(modified));
 
         void modify(const tspec_data_t &that, bool limited = false) {
             data.update(that, limited);
@@ -245,7 +245,6 @@ private:
         uint64_t primary_key() const { return id; }
         uint64_t foreign_key() const { return foreign_id; }
 
-        EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(data)(created)(modified));
     };
     multi_index<"tspecs"_n, tspec_app_t, indexed_by<"foreign"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>> _proposal_tspecs;
 
@@ -279,7 +278,6 @@ private:
         eosio::name fund_name;
         asset deposit;
         tspec_id_t tspec_id;
-        ///< perpetrator account name
         eosio::name worker;
         block_timestamp work_begining_time;
         uint8_t worker_payments_count;
