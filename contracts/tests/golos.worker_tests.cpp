@@ -213,6 +213,9 @@ class golos_worker_tester : public tester
             ("title", boost::str(boost::format("Proposal #%d") % proposal_id))
             ("description", long_text)));
 
+
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_APP);
+
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
             ("app_domain", app_domain)
             ("proposal_id", proposal_id)
@@ -227,6 +230,8 @@ class golos_worker_tester : public tester
                 ("payments_count", 1)
                 ("payments_interval", 1))));
 
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_APP);
+
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
             ("app_domain", app_domain)
             ("proposal_id", proposal_id)
@@ -240,8 +245,9 @@ class golos_worker_tester : public tester
                 ("payments_count", 2)
                 ("payments_interval", 1))));
 
-        // vote for the 0 technical specification application
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_APP);
 
+        // vote for the 0 technical specification application
         for (size_t i = 0; i < delegates.size(); i++)
         {
             const name &delegate = delegates[i];
@@ -254,6 +260,9 @@ class golos_worker_tester : public tester
                 ("comment_id", comment_id++)
                 ("comment", mvo()("text", "Lorem Ipsum"))));
         }
+
+
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_CREATE);
 
         /* ok,technical specification application has been choosen,
         now technical specification application author should publish
@@ -270,6 +279,8 @@ class golos_worker_tester : public tester
                 ("payments_count", 1)
                 ("payments_interval", 1))), wasm_assert_msg("cost can't be modified"));
 
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_CREATE);
+
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(publishtspec), mvo()
             ("app_domain", app_domain)
             ("proposal_id", proposal_id)
@@ -282,10 +293,14 @@ class golos_worker_tester : public tester
                 ("payments_count", 1)
                 ("payments_interval", 1))));
 
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_CREATE);
+
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(startwork), mvo()
             ("app_domain", app_domain)
             ("proposal_id", proposal_id)
             ("worker", worker_account)));
+
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_WORK);
 
         for (int i = 0; i < 5; i++) {
             ASSERT_SUCCESS(worker->push_action(worker_account, N(poststatus), mvo()
@@ -481,9 +496,9 @@ try
     for (uint64_t proposal_id = 0; proposal_id < 5; proposal_id++) {
         uint64_t comment_id = proposal_id  * 100;
 
-        const name &proposal_author = members[proposal_id * 3];
-        const name &tspec_author = members[proposal_id * 3 + 1];
-        const name &worker_account = members[proposal_id * 3 + 2];
+        const name& proposal_author = members[proposal_id * 3];
+        const name& tspec_author = members[proposal_id * 3 + 1];
+        const name& worker_account = members[proposal_id * 3 + 2];
 
         add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
 
@@ -506,6 +521,8 @@ try
             ("comment", mvo()
                 ("text", long_text))));
 
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_DELEGATES_REVIEW);
+
         for (size_t i = 0; i < delegates.size(); i++) {
             const name &delegate = delegates[i];
             ASSERT_SUCCESS(worker->push_action(delegate, N(reviewwork), mvo()
@@ -517,9 +534,13 @@ try
                 ("comment", mvo()("text", "Lorem Ipsum"))));
         }
 
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_PAYMENT);
+
         ASSERT_SUCCESS(worker->push_action(worker_account, N(withdraw), mvo()
             ("app_domain", app_domain)
             ("proposal_id", proposal_id)));
+
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_CLOSED);
 
         auto worker_balance = token->get_account(worker_account, "3,APP");
         REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
