@@ -24,6 +24,15 @@ using mvo = fc::mutable_variant_object;
 
 constexpr const char *long_text = "Lorem ipsum dolor sit amet, amet sint accusam sit te, te perfecto sadipscing vix, eam labore volumus dissentias ne. Est nonumy numquam fierent te. Te pri saperet disputando delicatissimi, pri semper ornatus ad. Paulo convenire argumentum cum te, te vix meis idque, odio tempor nostrum ius ad. Cu doctus mediocrem petentium his, eum sale errem timeam ne. Ludus debitis id qui, vix mucius antiopam ad. Facer signiferumque vis no, sale eruditi expetenda id ius.";
 
+enum state_t {
+    STATE_TSPEC_APP = 1,
+    STATE_TSPEC_CREATE,
+    STATE_WORK,
+    STATE_DELEGATES_REVIEW,
+    STATE_PAYMENT,
+    STATE_CLOSED
+};
+
 class base_contract
 {
   protected:
@@ -57,9 +66,9 @@ class base_contract
         return tester.push_action(move(act), uint64_t(signer));
     }
 
-    fc::variant get_table(name table_name, const char *struct_name, name scope)
+    fc::variant get_table_row(name table_name, const char *struct_name, name scope, uint64_t key)
     {
-        vector<char> data = tester.get_row_by_account(code_account, scope, table_name, scope);
+        vector<char> data = tester.get_row_by_account(code_account, scope, table_name, key);
         return data.empty() ? fc::variant() : abi_ser.binary_to_variant(struct_name, data, tester.abi_serializer_max_time);
     }
 };
@@ -103,8 +112,7 @@ class token_contract : public base_contract
     {
         auto symb = eosio::chain::symbol::from_string(symbolname);
         auto symbol_code = symb.to_symbol_code().value;
-        vector<char> data = tester.get_row_by_account( N(eosio.token), acc, N(accounts), symbol_code );
-        return data.empty() ? fc::variant() : abi_ser.binary_to_variant("account", data, tester.abi_serializer_max_time);
+        return get_table_row(N(accounts), "account", acc, symbol_code);
     }
 };
 
@@ -115,16 +123,16 @@ class worker_contract : public base_contract
     {
     }
 
-    fc::variant get_proposals(name scope) {
-        return base_contract::get_table(N(proposals), "proposal_t", scope);
+    fc::variant get_proposal(name scope, uint64_t id) {
+        return base_contract::get_table_row(N(proposals), "proposal_t", scope, id);
     }
 
     fc::variant get_state(name scope) {
-        return base_contract::get_table(N(state), "state_t", scope);
+        return base_contract::get_table_row(N(state), "state_t", scope, 0);
     }
 
-    fc::variant get_tspecs(name scope) {
-        return base_contract::get_table(N(tspecs), "tspec_data_t", scope);
+    fc::variant get_tspec(name scope, uint64_t id) {
+        return base_contract::get_table_row(N(tspecs), "tspec_data_t", scope, id);
     }
 };
 
@@ -286,18 +294,23 @@ BOOST_AUTO_TEST_SUITE(eosio_worker_tests)
 BOOST_FIXTURE_TEST_CASE(proposal_CUD, golos_worker_tester)
 try
 {
+    uint64_t proposal_id = 0;
+
     ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
         ("app_domain", app_domain)
-        ("proposal_id", 0)
+        ("proposal_id", proposal_id)
         ("author", members[0])
         ("title", "Proposal #1")
         ("description", "Description #1")));
 
     ASSERT_SUCCESS(worker->push_action(members[0], N(editpropos), mvo()
         ("app_domain", app_domain)
-        ("proposal_id", 0)
+        ("proposal_id", proposal_id)
         ("title", "New Proposal #1")
         ("description", "")));
+
+    auto proposal = worker->get_proposal(name(app_domain), proposal_id);
+    BOOST_REQUIRE_EQUAL(proposal["state"], STATE_TSPEC_APP);
 
     BOOST_REQUIRE_EQUAL(worker->push_action(members[0], N(editpropos), mvo()
         ("app_domain", app_domain)
@@ -314,11 +327,31 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(comment_CUD, golos_worker_tester)
 try
 {
-    ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()("app_domain", app_domain)("proposal_id", 0)("author", members[0])("title", "Proposal #1")("description", "Description #1")));
-    ASSERT_SUCCESS(worker->push_action(members[1], N(addcomment), mvo()("app_domain", app_domain)("proposal_id", 0)("comment_id", 0)("author", members[1])("data", mvo()("text", "Awesome!"))));
-    ASSERT_SUCCESS(worker->push_action(members[1], N(editcomment), mvo()("app_domain", app_domain)("proposal_id", 0)("comment_id", 0)("data", mvo()("text", "Awesome!"))));
-    ASSERT_SUCCESS(worker->push_action(members[1], N(delcomment), mvo()("app_domain", app_domain)("comment_id", 0)));
-    ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()("app_domain", app_domain)("proposal_id", 0)));
+    ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 0)
+        ("author", members[0])
+        ("title", "Proposal #1")
+        ("description", "Description #1")));
+    ASSERT_SUCCESS(worker->push_action(members[1], N(addcomment), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 0)
+        ("comment_id", 0)
+        ("author", members[1])
+        ("data", mvo()
+            ("text", "Awesome!"))));
+    ASSERT_SUCCESS(worker->push_action(members[1], N(editcomment), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 0)
+        ("comment_id", 0)
+        ("data", mvo()
+        ("text", "Awesome!"))));
+    ASSERT_SUCCESS(worker->push_action(members[1], N(delcomment), mvo()
+        ("app_domain", app_domain)
+        ("comment_id", 0)));
+    ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", 0)));
 }
 FC_LOG_AND_RETHROW()
 

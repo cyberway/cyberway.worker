@@ -273,6 +273,7 @@ private:
         proposal_id_t id;
         eosio::name author;
         uint8_t type;
+        uint8_t state;
         string title;
         string description;
         eosio::name fund_name;
@@ -281,13 +282,15 @@ private:
         ///< perpetrator account name
         eosio::name worker;
         block_timestamp work_begining_time;
-        block_timestamp payment_begining_time;
         uint8_t worker_payments_count;
+        block_timestamp payment_begining_time;
         block_timestamp created;
         block_timestamp modified;
-        uint8_t state;
 
-        EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(title)(description)(fund_name)(deposit)(tspec_id)(worker)(work_begining_time)(worker_payments_count)(created)(modified)(state));
+        EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(state)(title)(description)\
+            (fund_name)(deposit)(tspec_id)\
+            (worker)(work_begining_time)(worker_payments_count)\
+            (payment_begining_time)(created)(modified));
 
         uint64_t primary_key() const { return id; }
         void set_state(state_t new_state) { state = new_state; }
