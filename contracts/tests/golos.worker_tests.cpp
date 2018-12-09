@@ -566,6 +566,8 @@ try
         ("title", "Proposal #1")
         ("description", "Description #1")));
 
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_APP);
+
     ASSERT_SUCCESS(token->transfer(sponsor_account, WORKER_NAME, asset::from_string("10.000 APP"), app_domain));
     ASSERT_SUCCESS(worker->push_action(sponsor_account, N(setfund), mvo()
         ("app_domain", app_domain)
@@ -617,6 +619,9 @@ try
         }
     }
 
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_CREATE);
+
     /* ok,technical specification application has been choosen,
     now technical specification application author should publish
     a final technical specification */
@@ -637,6 +642,9 @@ try
         ("proposal_id", proposal_id)
         ("worker", worker_account.to_string())));
 
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_WORK);
+
     for (int i = 0; i < 5; i++) {
         ASSERT_SUCCESS(worker->push_action(worker_account, N(poststatus), mvo()
             ("app_domain", app_domain)
@@ -653,6 +661,9 @@ try
         ("comment", mvo()
             ("text", long_text))));
 
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_DELEGATES_REVIEW);
+
     {
         int i = 0;
         for (const auto &account : delegates)
@@ -668,18 +679,22 @@ try
         }
     }
 
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_PAYMENT);
+
     ASSERT_SUCCESS(worker->push_action(worker_account, N(withdraw), mvo()
         ("app_domain", app_domain)
         ("proposal_id", proposal_id)));
 
-   auto sponsor_balance = token->get_account(sponsor_account, "3,APP");
-   REQUIRE_MATCHING_OBJECT(sponsor_balance, mvo()("balance", "0.000 APP"));
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_CLOSED);
 
-   auto worker_balance = token->get_account(worker_account, "3,APP");
-   REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
+    auto sponsor_balance = token->get_account(sponsor_account, "3,APP");
+    REQUIRE_MATCHING_OBJECT(sponsor_balance, mvo()("balance", "0.000 APP"));
 
-   auto author_balance = token->get_account(author_account, "3,APP");
-   REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "15.000 APP"));
+    auto worker_balance = token->get_account(worker_account, "3,APP");
+    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
+
+    auto author_balance = token->get_account(author_account, "3,APP");
+    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "15.000 APP"));
 }
 FC_LOG_AND_RETHROW()
 
