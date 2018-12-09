@@ -127,6 +127,11 @@ class worker_contract : public base_contract
         return base_contract::get_table_row(N(proposals), "proposal_t", scope, id);
     }
 
+    uint8_t get_proposal_state(name scope, uint64_t proposal_id) {
+        auto proposal = get_proposal(scope, proposal_id);
+        return proposal["state"].as_int64();
+    }
+
     fc::variant get_state(name scope) {
         return base_contract::get_table_row(N(state), "state_t", scope, 0);
     }
@@ -294,33 +299,45 @@ BOOST_AUTO_TEST_SUITE(eosio_worker_tests)
 BOOST_FIXTURE_TEST_CASE(proposal_CUD, golos_worker_tester)
 try
 {
-    uint64_t proposal_id = 0;
+    for (uint64_t i = 0; i < 10; i++) {
+        const uint64_t proposal_id = i;
+        const name& author_account = members[i];
 
-    ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
-        ("app_domain", app_domain)
-        ("proposal_id", proposal_id)
-        ("author", members[0])
-        ("title", "Proposal #1")
-        ("description", "Description #1")));
+        ASSERT_SUCCESS(worker->push_action(author_account, N(addpropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("author", author_account)
+            ("title", "Proposal #1")
+            ("description", "Description #1")));
 
-    ASSERT_SUCCESS(worker->push_action(members[0], N(editpropos), mvo()
-        ("app_domain", app_domain)
-        ("proposal_id", proposal_id)
-        ("title", "New Proposal #1")
-        ("description", "")));
+        auto proposal_row = worker->get_proposal(name(app_domain), proposal_id);
+        BOOST_REQUIRE_EQUAL(proposal_row["state"], STATE_TSPEC_APP);
+        BOOST_REQUIRE_EQUAL(proposal_row["title"], "Proposal #1");
+        BOOST_REQUIRE_EQUAL(proposal_row["description"], "Description #1");
+        BOOST_REQUIRE_EQUAL(proposal_row["author"], author_account.to_string());
 
-    auto proposal = worker->get_proposal(name(app_domain), proposal_id);
-    BOOST_REQUIRE_EQUAL(proposal["state"], STATE_TSPEC_APP);
+        ASSERT_SUCCESS(worker->push_action(author_account, N(editpropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("title", "New Proposal #1")
+            ("description", "")));
 
-    BOOST_REQUIRE_EQUAL(worker->push_action(members[0], N(editpropos), mvo()
-        ("app_domain", app_domain)
-        ("proposal_id", 0)
-        ("title", "")
-        ("description", "")), wasm_assert_msg("invalid arguments"));
+        BOOST_REQUIRE_EQUAL(worker->push_action(author_account, N(editpropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("title", "")
+            ("description", "")), wasm_assert_msg("invalid arguments"));
 
-    ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
-        ("app_domain", app_domain)
-        ("proposal_id", 0)));
+        proposal_row = worker->get_proposal(name(app_domain), proposal_id);
+        BOOST_REQUIRE_EQUAL(proposal_row["title"], "New Proposal #1");
+
+        ASSERT_SUCCESS(worker->push_action(author_account, N(delpropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)));
+
+        proposal_row = worker->get_proposal(name(app_domain), proposal_id);
+        BOOST_REQUIRE(proposal_row.is_null());
+    }
 }
 FC_LOG_AND_RETHROW()
 
