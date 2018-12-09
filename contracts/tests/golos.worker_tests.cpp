@@ -727,6 +727,8 @@ try
             ("text", long_text))
         ));
 
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_DELEGATES_REVIEW);
+
     int i = 0;
     for (const auto &account : delegates) {
         ASSERT_SUCCESS(worker->push_action(account, N(reviewwork), mvo()
@@ -739,11 +741,15 @@ try
         i++;
     }
 
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_PAYMENT);
+
     for (int i = 0; i < payments_count; i++) {
         ASSERT_SUCCESS(worker->push_action(worker_account, N(withdraw), mvo()
             ("app_domain", app_domain)
             ("proposal_id", 1)));
     }
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_CLOSED);
 
    auto worker_balance = token->get_account(worker_account, "3,APP");
    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
