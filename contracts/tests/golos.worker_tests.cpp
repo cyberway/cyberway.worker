@@ -143,7 +143,15 @@ class worker_contract : public base_contract
     fc::variant get_proposal_comment(name scope, uint64_t id) {
         return base_contract::get_table_row(N(proposalsc), "comment_t", scope, id);
     }
+
+    fc::variant get_fund(const name& scope, const name& fund_name) {
+        return base_contract::get_table_row(N(funds), "fund_t", scope, fund_name);
+    }
 };
+
+const asset app_token_supply = asset::from_string("1000000.000 APP");
+const asset app_fund_supply = asset::from_string("100.000 APP");
+const asset initial_user_supply = asset::from_string("10.000 APP");
 
 class golos_worker_tester : public tester
 {
@@ -180,24 +188,25 @@ class golos_worker_tester : public tester
         token = make_unique<token_contract>(tester, TOKEN_NAME);
         worker = std::make_unique<worker_contract>(tester, WORKER_NAME);
 
-        auto supply = asset::from_string("1000.000 APP");
-        ASSERT_SUCCESS(token->create(TOKEN_NAME, supply));
+        ASSERT_SUCCESS(token->create(TOKEN_NAME, app_token_supply));
 
         for (account_name &account : members)
         {
-            ASSERT_SUCCESS(token->issue(TOKEN_NAME, account, asset::from_string("10.000 APP"), "initial issue"));
-            ASSERT_SUCCESS(token->open(account, supply.get_symbol().to_string(), account));
+            ASSERT_SUCCESS(token->issue(TOKEN_NAME, account, initial_user_supply, "initial issue"));
+            ASSERT_SUCCESS(token->open(account, initial_user_supply.get_symbol().to_string(), account));
             produce_blocks();
         }
 
         // create an application domain in the golos.worker
-        ASSERT_SUCCESS(worker->push_action(N(golos.app), N(createpool), mvo()("app_domain", app_domain)("token_symbol", supply.get_symbol())));
+        ASSERT_SUCCESS(worker->push_action(N(golos.app), N(createpool), mvo()("app_domain", app_domain)("token_symbol", app_token_supply.get_symbol())));
         produce_blocks();
 
         // add some funds to golos.worker contract
-        ASSERT_SUCCESS(token->issue(TOKEN_NAME, name(app_domain), asset::from_string("100.000 APP"), "initial issue"));
-        ASSERT_SUCCESS(token->open(name(app_domain), supply.get_symbol().to_string(), name(app_domain)));
-        ASSERT_SUCCESS(token->transfer(name(app_domain), WORKER_NAME, asset::from_string("100.000 APP"), app_domain));
+        ASSERT_SUCCESS(token->issue(TOKEN_NAME, name(app_domain), app_fund_supply, "initial issue"));
+        ASSERT_SUCCESS(token->open(name(app_domain), app_fund_supply.get_symbol().to_string(), name(app_domain)));
+        ASSERT_SUCCESS(token->transfer(name(app_domain), WORKER_NAME, app_fund_supply, app_domain));
+        BOOST_REQUIRE_EQUAL(worker->get_fund(name(app_domain), name(app_domain))["quantity"], app_fund_supply.to_string());
+
         produce_blocks();
     }
 
