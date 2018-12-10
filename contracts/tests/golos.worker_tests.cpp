@@ -588,6 +588,11 @@ try
     ASSERT_SUCCESS(worker->push_action(proposal_author, N(delpropos), mvo()
         ("app_domain", app_domain)
         ("proposal_id", proposal_id)));
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposals_count(name(app_domain)), 0);
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_comments_count(name(app_domain)), 0);
+    BOOST_REQUIRE_EQUAL(worker->get_tspecs_count(name(app_domain)), 0);
+
 }
 FC_LOG_AND_RETHROW()
 
