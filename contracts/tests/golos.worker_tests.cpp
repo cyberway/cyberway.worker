@@ -71,6 +71,25 @@ class base_contract
         vector<char> data = tester.get_row_by_account(code_account, scope, table_name, key);
         return data.empty() ? fc::variant() : abi_ser.binary_to_variant(struct_name, data, tester.abi_serializer_max_time);
     }
+
+    size_t get_table_size(name table, uint64_t scope) {
+        const auto& db = tester.control->db();
+        const auto* t_id = db.find<chain::table_id_object, chain::by_code_scope_table>(boost::make_tuple( code_account, scope, table));
+        if(!static_cast<bool>(t_id)) {
+            return 0;
+        }
+
+        const auto& idx = db.get_index<chain::key_value_index, chain::by_scope_primary>();
+
+        auto itr = idx.lower_bound( boost::make_tuple(t_id->id, 0) );
+        size_t count = 0;
+        while (itr != idx.end() && itr->t_id == t_id->id) {
+            count++;
+            itr++;
+        }
+
+        return count;
+    }
 };
 
 class token_contract : public base_contract
@@ -146,6 +165,18 @@ class worker_contract : public base_contract
 
     fc::variant get_fund(const name& scope, const name& fund_name) {
         return base_contract::get_table_row(N(funds), "fund_t", scope, fund_name);
+    }
+
+    size_t get_proposals_count(const uint64_t scope) {
+        return base_contract::get_table_size(N(proposals), scope);
+    }
+
+    size_t get_tspecs_count(const uint64_t scope) {
+        return base_contract::get_table_size(N(tspecs), scope);
+    }
+
+    size_t get_proposal_comments_count(const uint64_t scope) {
+        return base_contract::get_table_size(N(proposalsc), scope);
     }
 };
 
@@ -498,6 +529,65 @@ try
 
         BOOST_REQUIRE(worker->get_proposal(name(app_domain), proposal_id).is_null());
     }
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(proposal_removal, golos_worker_tester)
+try
+{
+    const uint64_t proposal_id = 0;
+    const name& proposal_author = members[0];
+    const name& tspec_author = members[1];
+    const name& comment_author = members[2];
+    constexpr size_t relative_rows_count = 10;
+
+    ASSERT_SUCCESS(worker->push_action(proposal_author, N(addpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("author", proposal_author)
+        ("title", "Proposal #1")
+        ("description", "Description #1"))
+    );
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposals_count(name(app_domain)), 1);
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_APP);
+
+    for (uint64_t j = 0; j < relative_rows_count; j++) {
+        const uint64_t tspec_app_id = 100 + j;
+        const uint64_t comment_id = 100 + j;
+
+        ASSERT_SUCCESS(worker->push_action(comment_author, N(addcomment), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("comment_id", comment_id)
+            ("author", comment_author)
+            ("data", mvo()
+                ("text", "Awesome!"))));
+
+        auto tspec_app = mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("tspec_app_id", tspec_app_id)
+            ("author", tspec_author)
+            ("tspec", mvo()
+                ("text", "Technical specification")
+                ("specification_cost", "1.000 APP")
+                ("specification_eta", 1)
+                ("development_cost", "1.000 APP")
+                ("development_eta", 1)
+                ("payments_count", 1)
+                ("payments_interval", 1));
+
+        ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), tspec_app));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_comments_count(name(app_domain)), relative_rows_count);
+    BOOST_REQUIRE_EQUAL(worker->get_tspecs_count(name(app_domain)), relative_rows_count);
+
+    ASSERT_SUCCESS(worker->push_action(proposal_author, N(delpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)));
 }
 FC_LOG_AND_RETHROW()
 
