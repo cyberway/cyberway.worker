@@ -152,6 +152,7 @@ class worker_contract : public base_contract
 const asset app_token_supply = asset::from_string("1000000.000 APP");
 const asset app_fund_supply = asset::from_string("100.000 APP");
 const asset initial_user_supply = asset::from_string("10.000 APP");
+const asset proposal_deposit = asset::from_string("10.000 APP");
 
 class golos_worker_tester : public tester
 {
@@ -270,8 +271,9 @@ class golos_worker_tester : public tester
                 ("comment", mvo()("text", "Lorem Ipsum"))));
         }
 
-
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_CREATE);
+        // if technical specification application was upvoted, `proposal_deposit` should be deposited from the application fund
+        BOOST_REQUIRE_EQUAL(worker->get_proposal(name(app_domain), proposal_id)["deposit"], proposal_deposit.to_string());
 
         /* ok,technical specification application has been choosen,
         now technical specification application author should publish
@@ -778,6 +780,9 @@ try
 
     add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
 
+    // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CREATE`, `STATE_WORK`
+    BOOST_REQUIRE_EQUAL(worker->get_fund(name(app_domain), name(app_domain))["quantity"], (app_fund_supply - proposal_deposit).to_string());
+
     ASSERT_SUCCESS(worker->push_action(worker_account, N(cancelwork), mvo()
         ("app_domain", app_domain)
         ("proposal_id", proposal_id)
@@ -789,11 +794,14 @@ try
 
     BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_CLOSED);
 
-    auto worker_balance = token->get_account(worker_account, "3,APP");
-    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "10.000 APP"));
+    // if proposal is closed deposit should be refunded to the application fund
+    BOOST_REQUIRE_EQUAL(worker->get_fund(name(app_domain), name(app_domain))["quantity"], app_fund_supply.to_string());
 
-    auto author_balance = token->get_account(tspec_author, "3,APP");
-    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "10.000 APP"));
+    auto worker_balance = token->get_account(worker_account, initial_user_supply.get_symbol().to_string());
+    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", initial_user_supply));
+
+    auto author_balance = token->get_account(tspec_author, initial_user_supply.get_symbol().to_string());
+    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", initial_user_supply));
 }
 FC_LOG_AND_RETHROW()
 
@@ -807,6 +815,9 @@ try
 
     add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
 
+    // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CREATE`, `STATE_WORK`
+    BOOST_REQUIRE_EQUAL(worker->get_fund(name(app_domain), name(app_domain))["quantity"], (app_fund_supply - proposal_deposit).to_string());
+
     ASSERT_SUCCESS(worker->push_action(tspec_author, N(cancelwork), mvo()
         ("app_domain", app_domain)
         ("proposal_id", proposal_id)
@@ -817,13 +828,14 @@ try
         ("proposal_id", proposal_id)), wasm_assert_msg("invalid state for withdraw"));
 
     BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_CLOSED);
+    // if proposal is closed deposit should be refunded to the application fund
+    BOOST_REQUIRE_EQUAL(worker->get_fund(name(app_domain), name(app_domain))["quantity"], app_fund_supply.to_string());
 
-    auto worker_balance = token->get_account(worker_account, "3,APP");
-    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "10.000 APP"));
+    auto worker_balance = token->get_account(worker_account, initial_user_supply.get_symbol().to_string());
+    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", initial_user_supply));
 
-    auto author_balance = token->get_account(tspec_author, "3,APP");
-    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "10.000 APP"));
-
+    auto author_balance = token->get_account(tspec_author, initial_user_supply.get_symbol().to_string());
+    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", initial_user_supply));
 }
 FC_LOG_AND_RETHROW()
 
@@ -837,6 +849,9 @@ try
     const name& worker_account = members[proposal_id * 3 + 2];
 
     add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
+
+    // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CREATE`, `STATE_WORK`
+    BOOST_REQUIRE_EQUAL(worker->get_fund(name(app_domain), name(app_domain))["quantity"], (app_fund_supply - proposal_deposit).to_string());
 
     for (size_t i = 0; i < delegates.size() * 3 / 4 + 1; i++) {
         const name &delegate = delegates[i];
@@ -854,12 +869,14 @@ try
         ("proposal_id", proposal_id)), wasm_assert_msg("invalid state for withdraw"));
 
     BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_CLOSED);
+    // if proposal is closed deposit should be refunded to the application fund
+    BOOST_REQUIRE_EQUAL(worker->get_fund(name(app_domain), name(app_domain))["quantity"], app_fund_supply.to_string());
 
-    auto worker_balance = token->get_account(worker_account, "3,APP");
-    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "10.000 APP"));
+    auto worker_balance = token->get_account(worker_account, initial_user_supply.get_symbol().to_string());
+    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", initial_user_supply));
 
-    auto author_balance = token->get_account(tspec_author, "3,APP");
-    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "10.000 APP"));
+    auto author_balance = token->get_account(tspec_author, initial_user_supply.get_symbol().to_string());
+    REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", initial_user_supply));
 }
 FC_LOG_AND_RETHROW()
 
