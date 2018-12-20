@@ -346,13 +346,6 @@ protected:
         return proposal;
     }
 
-    auto get_fund(eosio::name fund_name)
-    {
-        auto fund_ptr = _funds.find(fund_name.value);
-        eosio_assert(fund_ptr != _funds.end(), "fund doesn't exists");
-        return fund_ptr;
-    }
-
     void deposit(proposal_t &proposal) {
         const tspec_data_t &tspec = _proposal_tspecs.get(proposal.tspec_id).data;
         const asset budget = tspec.development_cost + tspec.specification_cost;
@@ -406,10 +399,10 @@ protected:
     {
         eosio_assert(proposal.deposit.amount > 0, "no funds were deposited");
 
-        auto fund_ptr = get_fund(proposal.fund_name);
-        LOG("% to % fund", proposal.deposit, ACCOUNT_NAME_CSTR(fund_ptr->owner));
-        _funds.modify(fund_ptr, modifier, [&](auto &fund) {
-            fund.quantity += proposal.deposit;
+        auto fund = _funds.get(proposal.fund_name.value);
+        LOG("% to % fund", proposal.deposit, ACCOUNT_NAME_CSTR(fund.owner));
+        _funds.modify(fund, modifier, [&](auto &obj) {
+            obj.quantity += proposal.deposit;
         });
 
         proposal.deposit = ZERO_ASSET;
@@ -550,20 +543,20 @@ public:
         auto proposal_ptr = _proposals.find(proposal_id);
         eosio_assert(proposal_ptr != _proposals.end(), "proposal has not been found");
         require_app_member(fund_name);
-
+        eosio_assert(get_state().token_symbol == quantity.symbol, "invalid symbol for setfund");
         eosio_assert(proposal_ptr->deposit.amount == 0, "fund is already deposited");
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for setfund");
 
-        auto fund_ptr = get_fund(fund_name);
-        eosio_assert(fund_ptr->quantity >= quantity, "insufficient funds");
+        auto fund = _funds.get(fund_name.value);
+        eosio_assert(fund.quantity >= quantity, "insufficient funds");
 
         _proposals.modify(proposal_ptr, fund_name, [&](auto &o) {
             o.fund_name = fund_name;
             o.deposit = quantity;
         });
 
-        _funds.modify(fund_ptr, fund_name, [&](auto &fund) {
-            fund.quantity -= quantity;
+        _funds.modify(fund, fund_name, [&](auto &obj) {
+            obj.quantity -= quantity;
         });
     }
 
