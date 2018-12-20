@@ -356,14 +356,13 @@ protected:
     void deposit(proposal_t &proposal, const name &modifier) {
         const tspec_data_t &tspec = _proposal_tspecs.get(proposal.tspec_id).data;
         const asset budget = tspec.development_cost + tspec.specification_cost;
-        auto fund = _funds.find(proposal.fund_name.value);
-        eosio_assert(fund != _funds.end(), "fund doesn't exist");
+        auto fund = _funds.get(proposal.fund_name.value);
         LOG("proposal.id: %, budget: %, fund: %", proposal.id, budget, proposal.fund_name);
-        eosio_assert(budget <= fund->quantity, "insufficient funds");
+        eosio_assert(budget <= fund.quantity, "insufficient funds");
 
         proposal.deposit = budget;
-        _funds.modify(fund, modifier, [&](auto &fund) {
-            fund.quantity -= budget;
+        _funds.modify(fund, modifier, [&](auto &obj) {
+            obj.quantity -= budget;
         });
     }
 
