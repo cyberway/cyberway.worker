@@ -353,7 +353,7 @@ protected:
         return fund_ptr;
     }
 
-    void deposit(proposal_t &proposal, const name &modifier) {
+    void deposit(proposal_t &proposal) {
         const tspec_data_t &tspec = _proposal_tspecs.get(proposal.tspec_id).data;
         const asset budget = tspec.development_cost + tspec.specification_cost;
         auto fund = _funds.get(proposal.fund_name.value);
@@ -361,12 +361,12 @@ protected:
         eosio_assert(budget <= fund.quantity, "insufficient funds");
 
         proposal.deposit = budget;
-        _funds.modify(fund, modifier, [&](auto &obj) {
+        _funds.modify(fund, name(), [&](auto &obj) {
             obj.quantity -= budget;
         });
     }
 
-    void choose_proposal_tspec(proposal_t & proposal, const tspec_app_t &tspec_app, eosio::name modifier)
+    void choose_proposal_tspec(proposal_t & proposal, const tspec_app_t &tspec_app)
     {
         eosio_assert(proposal.type == proposal_t::TYPE_1, "invalid state for choose_proposal_tspec");
         proposal.tspec_id = tspec_app.id;
@@ -375,7 +375,7 @@ protected:
         // funds can be deposited in setfund(), if not, it will be deposited here
         if (proposal.deposit.amount == 0)
         {
-            deposit(proposal, modifier);
+            deposit(proposal);
         }
     }
 
@@ -810,7 +810,7 @@ public:
             //TODO: check that all voters are delegates in this moment
             LOG("technical specification % got % positive votes", tspec_app_id, positive_votes_count);
             _proposals.modify(proposal, author, [&](proposal_t &obj) {
-                choose_proposal_tspec(obj, tspec_app, author);
+                choose_proposal_tspec(obj, tspec_app);
             });
         }
     }
@@ -982,7 +982,7 @@ public:
                     LOG("work has been accepted by the delegates voting, got % positive votes", positive_votes_count);
 
                     if (proposal.deposit.amount == 0 && proposal.type == proposal_t::TYPE_2) {
-                        deposit(proposal, reviewer);
+                        deposit(proposal);
                     }
 
                     pay_tspec_author(proposal);
