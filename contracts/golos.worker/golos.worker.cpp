@@ -180,7 +180,7 @@ private:
         uint32_t specification_eta;
         asset development_cost;
         uint32_t development_eta;
-        uint8_t payments_count;
+        uint16_t payments_count;
         uint32_t payments_interval;
 
         EOSLIB_SERIALIZE(tspec_data_t, (text) \
