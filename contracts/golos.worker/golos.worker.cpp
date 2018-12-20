@@ -627,16 +627,16 @@ public:
        * @param vote 1 for positive vote, 0 for negative vote. Look at the voting_module_t::vote_t
        */
     [[eosio::action]]
-    void votepropos(proposal_id_t proposal_id, eosio::name author, uint8_t positive)
+    void votepropos(proposal_id_t proposal_id, eosio::name voter, uint8_t positive)
     {
         auto proposal_ptr = _proposals.find(proposal_id);
         eosio_assert(proposal_ptr != _proposals.end(), "proposal has not been found");
         eosio_assert(voting_time_s + proposal_ptr->created.to_time_point().sec_since_epoch() >= now(), "voting time is over");
-        require_app_member(author);
+        require_app_member(voter);
 
         vote_t vote{
             .foreign_id = proposal_id,
-            .voter = author,
+            .voter = voter,
             .positive = positive != 0
         };
         _proposal_votes.vote(vote);

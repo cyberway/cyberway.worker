@@ -616,7 +616,7 @@ try
             ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
                 ("app_domain", app_domain)
                 ("proposal_id", proposal_id)
-                ("author", delegate)
+                ("voter", delegate)
                 ("positive", (i + 1) % 2)));
         }
 
