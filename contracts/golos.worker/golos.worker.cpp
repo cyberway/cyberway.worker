@@ -594,19 +594,23 @@ public:
     void delpropos(proposal_id_t proposal_id) {
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for delpropos");
-        eosio_assert(_proposal_votes.count_positive(proposal_id) == 0, "proposal has been already upvoted");
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
-
         require_app_member(proposal_ptr->author);
+
+        auto tspec_index = _proposal_tspecs.get_index<"foreign"_n>();
+        auto tspec_lower_bound = tspec_index.lower_bound(proposal_id);
+
+
+        for (auto tspec_ptr = tspec_lower_bound; tspec_ptr != tspec_index.upper_bound(proposal_id); tspec_ptr++) {
+            eosio_assert(_proposal_tspec_votes.count_positive(tspec_ptr->id) == 0, "proposal contains partly-approved technical specification applications");
+        }
 
         _proposal_comments.del_all(proposal_id);
         _proposal_review_comments.del_all(proposal_id);
         _proposal_status_comments.del_all(proposal_id);
         _proposal_votes.del_all(proposal_id);
 
-        auto tspec_index = _proposal_tspecs.get_index<"foreign"_n>();
-        auto tspec_ptr = tspec_index.lower_bound(proposal_id);
-        while (tspec_ptr != tspec_index.upper_bound(proposal_id)) {
+        for (auto tspec_ptr = tspec_lower_bound; tspec_ptr != tspec_index.upper_bound(proposal_id); ) {
             del_tspec(*(tspec_ptr++));
         }
 
