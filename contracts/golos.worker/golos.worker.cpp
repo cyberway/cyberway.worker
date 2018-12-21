@@ -139,20 +139,14 @@ private:
             });
         }
 
-        size_t count(uint64_t foreign_id) const {
-            auto index = votes.template get_index<"foreign"_n>();
-            return (size_t)index.upper_bound(foreign_id) - index.lower_bound(foreign_id) + 1;
-        }
-
         void vote(const vote_t &vote) {
             auto index = votes.template get_index<"foreign"_n>();
             for (auto vote_ptr = index.lower_bound(vote.foreign_id); vote_ptr != index.upper_bound(vote.foreign_id); vote_ptr++) {
                 if (vote_ptr->voter == vote.voter) {
-                    if ((vote_ptr->positive) != vote.positive) {
-                        votes.modify(votes.get(vote_ptr->id), vote.voter, [&](auto &obj) {
-                            obj.positive = vote.positive;
-                        });
-                    }
+                    eosio_assert(vote_ptr->positive != vote.positive, "the vote already exists");
+                    votes.modify(votes.get(vote_ptr->id), vote.voter, [&](auto &obj) {
+                        obj.positive = vote.positive;
+                    });
                     return;
                 }
             }
