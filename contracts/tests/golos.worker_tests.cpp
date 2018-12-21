@@ -90,6 +90,27 @@ class base_contract
 
         return count;
     }
+
+    vector<fc::variant> get_table_rows(name table, const char *struct_name, uint64_t scope) {
+        const auto& db = tester.control->db();
+        const auto* t_id = db.find<chain::table_id_object, chain::by_code_scope_table>(boost::make_tuple( code_account, scope, table));
+        if(!static_cast<bool>(t_id)) {
+            return 0;
+        }
+
+        const auto& idx = db.get_index<chain::key_value_index, chain::by_scope_primary>();
+
+        auto itr = idx.lower_bound( boost::make_tuple(t_id->id, 0) );
+        vector<fc::variant> objects;
+        while (itr != idx.end() && itr->t_id == t_id->id) {
+           vector<char> data;
+           data.resize(itr->value.size());
+           memcpy(data.data(), itr->value.data(), data.size());
+           objects.push_back(abi_ser.binary_to_variant(struct_name, data, tester.abi_serializer_max_time));
+        }
+
+        return std::move(objects);
+    }
 };
 
 class token_contract : public base_contract
