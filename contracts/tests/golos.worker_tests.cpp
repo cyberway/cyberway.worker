@@ -178,6 +178,10 @@ class worker_contract : public base_contract
     size_t get_proposal_comments_count(const uint64_t scope) {
         return base_contract::get_table_size(N(proposalsc), scope);
     }
+
+    size_t get_proposal_votes_count(const uint64_t scope) {
+        return base_contract::get_table_size(N(proposalsv), scope);
+    }
 };
 
 const asset app_token_supply = asset::from_string("1000000.000 APP");
@@ -456,6 +460,70 @@ try
         ("proposal_id", proposal_id)));
 
     BOOST_REQUIRE(worker->get_proposal(name(app_domain), proposal_id).is_null());
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(vote_CUD, golos_worker_tester)
+try
+{
+    const uint64_t proposal_id = 0;
+
+    ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("author", members[0])
+        ("title", "Proposal #1")
+        ("description", "Description #1")));
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), 0);
+
+    for (size_t i = 0; i < delegates.size(); i++)
+    {
+        name &delegate = delegates[i];
+
+        ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("voter", delegate)
+            ("positive", (i + 1) % 2)));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), delegates.size());
+
+    // revote with the same `positive` value
+    for (size_t i = 0; i < delegates.size(); i++)
+    {
+        name &delegate = delegates[i];
+
+        BOOST_REQUIRE_EQUAL(worker->push_action(delegate, N(votepropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("voter", delegate)
+            ("positive", (i + 1) % 2)), wasm_assert_msg("the vote already exists"));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), delegates.size());
+
+    // revote with the different `positive` value
+    for (size_t i = 0; i < delegates.size(); i++)
+    {
+        name &delegate = delegates[i];
+
+        ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("voter", delegate)
+            ("positive", (i) % 2)));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), delegates.size());
+
+
+    ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)));
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), 0);
 }
 FC_LOG_AND_RETHROW()
 
