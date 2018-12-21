@@ -343,7 +343,7 @@ protected:
     void deposit(proposal_t &proposal) {
         const tspec_data_t &tspec = _proposal_tspecs.get(proposal.tspec_id).data;
         const asset budget = tspec.development_cost + tspec.specification_cost;
-        auto fund = _funds.get(proposal.fund_name.value);
+        const auto &fund = _funds.get(proposal.fund_name.value);
         LOG("proposal.id: %, budget: %, fund: %", proposal.id, budget, proposal.fund_name);
         eosio_assert(budget <= fund.quantity, "insufficient funds");
 
@@ -393,7 +393,7 @@ protected:
     {
         eosio_assert(proposal.deposit.amount > 0, "no funds were deposited");
 
-        auto fund = _funds.get(proposal.fund_name.value);
+        const auto &fund = _funds.get(proposal.fund_name.value);
         LOG("% to % fund", proposal.deposit, ACCOUNT_NAME_CSTR(fund.owner));
         _funds.modify(fund, modifier, [&](auto &obj) {
             obj.quantity += proposal.deposit;
@@ -541,7 +541,7 @@ public:
         eosio_assert(proposal_ptr->deposit.amount == 0, "fund is already deposited");
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for setfund");
 
-        auto fund = _funds.get(fund_name.value);
+        const auto &fund = _funds.get(fund_name.value);
         eosio_assert(fund.quantity >= quantity, "insufficient funds");
 
         _proposals.modify(proposal_ptr, fund_name, [&](auto &o) {
