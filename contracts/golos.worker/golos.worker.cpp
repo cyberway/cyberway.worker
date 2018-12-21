@@ -139,20 +139,14 @@ private:
             });
         }
 
-        size_t count(uint64_t foreign_id) const {
-            auto index = votes.template get_index<"foreign"_n>();
-            return (size_t)index.upper_bound(foreign_id) - index.lower_bound(foreign_id) + 1;
-        }
-
         void vote(const vote_t &vote) {
             auto index = votes.template get_index<"foreign"_n>();
             for (auto vote_ptr = index.lower_bound(vote.foreign_id); vote_ptr != index.upper_bound(vote.foreign_id); vote_ptr++) {
                 if (vote_ptr->voter == vote.voter) {
-                    if ((vote_ptr->positive) != vote.positive) {
-                        votes.modify(votes.get(vote_ptr->id), vote.voter, [&](auto &obj) {
-                            obj.positive = vote.positive;
-                        });
-                    }
+                    eosio_assert(vote_ptr->positive != vote.positive, "the vote already exists");
+                    votes.modify(votes.get(vote_ptr->id), vote.voter, [&](auto &obj) {
+                        obj.positive = vote.positive;
+                    });
                     return;
                 }
             }
@@ -180,7 +174,7 @@ private:
         uint32_t specification_eta;
         asset development_cost;
         uint32_t development_eta;
-        uint8_t payments_count;
+        uint16_t payments_count;
         uint32_t payments_interval;
 
         EOSLIB_SERIALIZE(tspec_data_t, (text) \
@@ -346,28 +340,20 @@ protected:
         return proposal;
     }
 
-    auto get_fund(eosio::name fund_name)
-    {
-        auto fund_ptr = _funds.find(fund_name.value);
-        eosio_assert(fund_ptr != _funds.end(), "fund doesn't exists");
-        return fund_ptr;
-    }
-
-    void deposit(proposal_t &proposal, const name &modifier) {
+    void deposit(proposal_t &proposal) {
         const tspec_data_t &tspec = _proposal_tspecs.get(proposal.tspec_id).data;
         const asset budget = tspec.development_cost + tspec.specification_cost;
-        auto fund = _funds.find(proposal.fund_name.value);
-        eosio_assert(fund != _funds.end(), "fund doesn't exist");
+        const auto &fund = _funds.get(proposal.fund_name.value);
         LOG("proposal.id: %, budget: %, fund: %", proposal.id, budget, proposal.fund_name);
-        eosio_assert(budget <= fund->quantity, "insufficient funds");
+        eosio_assert(budget <= fund.quantity, "insufficient funds");
 
         proposal.deposit = budget;
-        _funds.modify(fund, modifier, [&](auto &fund) {
-            fund.quantity -= budget;
+        _funds.modify(fund, name(), [&](auto &obj) {
+            obj.quantity -= budget;
         });
     }
 
-    void choose_proposal_tspec(proposal_t & proposal, const tspec_app_t &tspec_app, eosio::name modifier)
+    void choose_proposal_tspec(proposal_t & proposal, const tspec_app_t &tspec_app)
     {
         eosio_assert(proposal.type == proposal_t::TYPE_1, "invalid state for choose_proposal_tspec");
         proposal.tspec_id = tspec_app.id;
@@ -376,7 +362,7 @@ protected:
         // funds can be deposited in setfund(), if not, it will be deposited here
         if (proposal.deposit.amount == 0)
         {
-            deposit(proposal, modifier);
+            deposit(proposal);
         }
     }
 
@@ -407,10 +393,10 @@ protected:
     {
         eosio_assert(proposal.deposit.amount > 0, "no funds were deposited");
 
-        auto fund_ptr = get_fund(proposal.fund_name);
-        LOG("% to % fund", proposal.deposit, ACCOUNT_NAME_CSTR(fund_ptr->owner));
-        _funds.modify(fund_ptr, modifier, [&](auto &fund) {
-            fund.quantity += proposal.deposit;
+        const auto &fund = _funds.get(proposal.fund_name.value);
+        LOG("% to % fund", proposal.deposit, ACCOUNT_NAME_CSTR(fund.owner));
+        _funds.modify(fund, modifier, [&](auto &obj) {
+            obj.quantity += proposal.deposit;
         });
 
         proposal.deposit = ZERO_ASSET;
@@ -551,20 +537,20 @@ public:
         auto proposal_ptr = _proposals.find(proposal_id);
         eosio_assert(proposal_ptr != _proposals.end(), "proposal has not been found");
         require_app_member(fund_name);
-
+        eosio_assert(get_state().token_symbol == quantity.symbol, "invalid symbol for setfund");
         eosio_assert(proposal_ptr->deposit.amount == 0, "fund is already deposited");
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for setfund");
 
-        auto fund_ptr = get_fund(fund_name);
-        eosio_assert(fund_ptr->quantity >= quantity, "insufficient funds");
+        const auto &fund = _funds.get(fund_name.value);
+        eosio_assert(fund.quantity >= quantity, "insufficient funds");
 
         _proposals.modify(proposal_ptr, fund_name, [&](auto &o) {
             o.fund_name = fund_name;
             o.deposit = quantity;
         });
 
-        _funds.modify(fund_ptr, fund_name, [&](auto &fund) {
-            fund.quantity -= quantity;
+        _funds.modify(fund, fund_name, [&](auto &obj) {
+            obj.quantity -= quantity;
         });
     }
 
@@ -602,19 +588,23 @@ public:
     void delpropos(proposal_id_t proposal_id) {
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for delpropos");
-        eosio_assert(_proposal_votes.count_positive(proposal_id) == 0, "proposal has been already upvoted");
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
-
         require_app_member(proposal_ptr->author);
+
+        auto tspec_index = _proposal_tspecs.get_index<"foreign"_n>();
+        auto tspec_lower_bound = tspec_index.lower_bound(proposal_id);
+
+
+        for (auto tspec_ptr = tspec_lower_bound; tspec_ptr != tspec_index.upper_bound(proposal_id); tspec_ptr++) {
+            eosio_assert(_proposal_tspec_votes.count_positive(tspec_ptr->id) == 0, "proposal contains partly-approved technical specification applications");
+        }
 
         _proposal_comments.del_all(proposal_id);
         _proposal_review_comments.del_all(proposal_id);
         _proposal_status_comments.del_all(proposal_id);
         _proposal_votes.del_all(proposal_id);
 
-        auto tspec_index = _proposal_tspecs.get_index<"foreign"_n>();
-        auto tspec_ptr = tspec_index.lower_bound(proposal_id);
-        while (tspec_ptr != tspec_index.upper_bound(proposal_id)) {
+        for (auto tspec_ptr = tspec_lower_bound; tspec_ptr != tspec_index.upper_bound(proposal_id); ) {
             del_tspec(*(tspec_ptr++));
         }
 
@@ -628,16 +618,16 @@ public:
        * @param vote 1 for positive vote, 0 for negative vote. Look at the voting_module_t::vote_t
        */
     [[eosio::action]]
-    void votepropos(proposal_id_t proposal_id, eosio::name author, uint8_t positive)
+    void votepropos(proposal_id_t proposal_id, eosio::name voter, uint8_t positive)
     {
         auto proposal_ptr = _proposals.find(proposal_id);
         eosio_assert(proposal_ptr != _proposals.end(), "proposal has not been found");
         eosio_assert(voting_time_s + proposal_ptr->created.to_time_point().sec_since_epoch() >= now(), "voting time is over");
-        require_app_member(author);
+        require_app_member(voter);
 
         vote_t vote{
             .foreign_id = proposal_id,
-            .voter = author,
+            .voter = voter,
             .positive = positive != 0
         };
         _proposal_votes.vote(vote);
@@ -811,7 +801,7 @@ public:
             //TODO: check that all voters are delegates in this moment
             LOG("technical specification % got % positive votes", tspec_app_id, positive_votes_count);
             _proposals.modify(proposal, author, [&](proposal_t &obj) {
-                choose_proposal_tspec(obj, tspec_app, author);
+                choose_proposal_tspec(obj, tspec_app);
             });
         }
     }
@@ -983,7 +973,7 @@ public:
                     LOG("work has been accepted by the delegates voting, got % positive votes", positive_votes_count);
 
                     if (proposal.deposit.amount == 0 && proposal.type == proposal_t::TYPE_2) {
-                        deposit(proposal, reviewer);
+                        deposit(proposal);
                     }
 
                     pay_tspec_author(proposal);

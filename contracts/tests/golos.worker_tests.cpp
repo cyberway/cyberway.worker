@@ -90,6 +90,27 @@ class base_contract
 
         return count;
     }
+
+    vector<fc::variant> get_table_rows(name table, const char *struct_name, uint64_t scope) {
+        const auto& db = tester.control->db();
+        const auto* t_id = db.find<chain::table_id_object, chain::by_code_scope_table>(boost::make_tuple( code_account, scope, table));
+        if(!static_cast<bool>(t_id)) {
+            return 0;
+        }
+
+        const auto& idx = db.get_index<chain::key_value_index, chain::by_scope_primary>();
+
+        auto itr = idx.lower_bound( boost::make_tuple(t_id->id, 0) );
+        vector<fc::variant> objects;
+        while (itr != idx.end() && itr->t_id == t_id->id) {
+           vector<char> data;
+           data.resize(itr->value.size());
+           memcpy(data.data(), itr->value.data(), data.size());
+           objects.push_back(abi_ser.binary_to_variant(struct_name, data, tester.abi_serializer_max_time));
+        }
+
+        return std::move(objects);
+    }
 };
 
 class token_contract : public base_contract
@@ -177,6 +198,10 @@ class worker_contract : public base_contract
 
     size_t get_proposal_comments_count(const uint64_t scope) {
         return base_contract::get_table_size(N(proposalsc), scope);
+    }
+
+    size_t get_proposal_votes_count(const uint64_t scope) {
+        return base_contract::get_table_size(N(proposalsv), scope);
     }
 };
 
@@ -459,6 +484,70 @@ try
 }
 FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE(vote_CUD, golos_worker_tester)
+try
+{
+    const uint64_t proposal_id = 0;
+
+    ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)
+        ("author", members[0])
+        ("title", "Proposal #1")
+        ("description", "Description #1")));
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), 0);
+
+    for (size_t i = 0; i < delegates.size(); i++)
+    {
+        name &delegate = delegates[i];
+
+        ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("voter", delegate)
+            ("positive", (i + 1) % 2)));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), delegates.size());
+
+    // revote with the same `positive` value
+    for (size_t i = 0; i < delegates.size(); i++)
+    {
+        name &delegate = delegates[i];
+
+        BOOST_REQUIRE_EQUAL(worker->push_action(delegate, N(votepropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("voter", delegate)
+            ("positive", (i + 1) % 2)), wasm_assert_msg("the vote already exists"));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), delegates.size());
+
+    // revote with the different `positive` value
+    for (size_t i = 0; i < delegates.size(); i++)
+    {
+        name &delegate = delegates[i];
+
+        ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("voter", delegate)
+            ("positive", (i) % 2)));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), delegates.size());
+
+
+    ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
+        ("app_domain", app_domain)
+        ("proposal_id", proposal_id)));
+
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), 0);
+}
+FC_LOG_AND_RETHROW()
+
 BOOST_FIXTURE_TEST_CASE(technical_specification_application_CUD, golos_worker_tester)
 try
 {
@@ -616,7 +705,7 @@ try
             ASSERT_SUCCESS(worker->push_action(delegate, N(votepropos), mvo()
                 ("app_domain", app_domain)
                 ("proposal_id", proposal_id)
-                ("author", delegate)
+                ("voter", delegate)
                 ("positive", (i + 1) % 2)));
         }
 
