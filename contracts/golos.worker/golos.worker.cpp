@@ -794,7 +794,6 @@ public:
    * @param proposal_id proposal ID
    * @param tspec_app_id technical specification application
    * @param author voting account name
-   * @param vote 1 - for the positive vote, 0 - for the negative vote. Look at a voting_module_t::vote_t
    * @param comment_id comment ID of the comment that will be attached as a description to the vote
    * @param comment attached comment data
    */
@@ -806,11 +805,11 @@ public:
         proposal_id_t proposal_id = tspec_app.foreign_id;
         const proposal_t &proposal = _proposals.get(proposal_id);
 
-        eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for votetspec");
+        eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for approvetspec");
         eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
 
         require_app_delegate(author);
-        eosio_assert(voting_time_s + tspec_app.created.to_time_point().sec_since_epoch() >= now(), "voting time is over");
+        eosio_assert(voting_time_s + tspec_app.created.to_time_point().sec_since_epoch() >= now(), "approve time is over");
 
         if (!comment.text.empty())
         {
@@ -828,6 +827,26 @@ public:
                 choose_proposal_tspec(obj, tspec_app);
             });
         }
+    }
+
+    /**
+     * @brief approvetspec unapprove technical specification application
+     **/
+    [[eosio::action]]
+    void dapprovetspec(tspec_id_t tspec_app_id, eosio::name author) {
+        LOG("tpsec.id: %, author: %", tspec_app_id, ACCOUNT_NAME_CSTR(author));
+
+        const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
+        proposal_id_t proposal_id = tspec_app.foreign_id;
+        const proposal_t &proposal = _proposals.get(proposal_id);
+
+        eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for dapprovetspec");
+        eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
+
+        require_auth(author);
+        eosio_assert(voting_time_s + tspec_app.created.to_time_point().sec_since_epoch() >= now(), "approve time is over");
+
+        _proposal_tspec_votes.unapprove(tspec_app_id, author);
     }
 
     /**
@@ -1119,5 +1138,5 @@ public:
 };
 } // namespace golos
 
-APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos2)(addpropos)(setfund)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(publishtspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw),
+APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos2)(addpropos)(setfund)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(publishtspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw),
                (transfer))
