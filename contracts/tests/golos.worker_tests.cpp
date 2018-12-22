@@ -80,12 +80,9 @@ class base_contract
         }
 
         const auto& idx = db.get_index<chain::key_value_index, chain::by_scope_primary>();
-
-        auto itr = idx.lower_bound( boost::make_tuple(t_id->id, 0) );
         size_t count = 0;
-        while (itr != idx.end() && itr->t_id == t_id->id) {
+        for (auto itr = idx.lower_bound(boost::make_tuple(t_id->id, 0)); itr != idx.end() && itr->t_id == t_id->id; itr++) {
             count++;
-            itr++;
         }
 
         return count;
@@ -95,21 +92,18 @@ class base_contract
         const auto& db = tester.control->db();
         const auto* t_id = db.find<chain::table_id_object, chain::by_code_scope_table>(boost::make_tuple( code_account, scope, table));
         if(!static_cast<bool>(t_id)) {
-            return 0;
+            return {};
         }
 
         const auto& idx = db.get_index<chain::key_value_index, chain::by_scope_primary>();
-
-        auto itr = idx.lower_bound( boost::make_tuple(t_id->id, 0) );
         vector<fc::variant> objects;
-        while (itr != idx.end() && itr->t_id == t_id->id) {
-           vector<char> data;
-           data.resize(itr->value.size());
+        for (auto itr = idx.lower_bound(boost::make_tuple(t_id->id, 0)); itr != idx.end() && itr->t_id == t_id->id; itr++) {
+           vector<char> data(itr->value.size());
            memcpy(data.data(), itr->value.data(), data.size());
            objects.push_back(abi_ser.binary_to_variant(struct_name, data, tester.abi_serializer_max_time));
         }
 
-        return std::move(objects);
+        return objects;
     }
 };
 
@@ -539,6 +533,16 @@ try
 
     BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), delegates.size());
 
+    auto votes = worker->get_table_rows(N(proposalsv), "vote_t", name(app_domain));
+    BOOST_REQUIRE_EQUAL(delegates.size(), votes.size());
+    // revote with the different `positive` value
+    for (size_t i = 0; i < delegates.size(); i++)
+    {
+        name &delegate = delegates[i];
+        fc::variant &vote = votes[i];
+
+        BOOST_REQUIRE_EQUAL(vote["positive"], i % 2);
+    }
 
     ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
         ("app_domain", app_domain)
