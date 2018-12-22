@@ -592,6 +592,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(technical_specification_application_CUD, golos_worker_tester)
 try
 {
+    uint64_t comment_id = 0;
+
     for (uint64_t i = 0; i < 10; i++) {
         const uint64_t proposal_id = i;
         const name& proposal_author = members[i * 2];
@@ -645,6 +647,19 @@ try
             tspec_row = worker->get_tspec(name(app_domain), tspec_app_id);
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["specification_cost"].as_string(), "2.000 APP");
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["development_cost"].as_string(), "2.000 APP");
+
+            const name& approver = delegates[0];
+            ASSERT_SUCCESS(worker->push_action(approver, N(approvetspec), mvo()
+                ("app_domain", app_domain)
+                ("tspec_app_id", tspec_app_id)
+                ("author", approver)
+                ("comment_id", comment_id++)
+                ("comment", mvo()("text", "Lorem Ipsum"))));
+
+            ASSERT_SUCCESS(worker->push_action(approver, N(dapprovetspec), mvo()
+                ("app_domain", app_domain)
+                ("tspec_app_id", tspec_app_id)
+                ("author", approver)));
 
             ASSERT_SUCCESS(worker->push_action(tspec_author, N(deltspec), mvo()
                 ("app_domain", app_domain)
