@@ -23,6 +23,8 @@ using mvo = fc::mutable_variant_object;
 #define ASSERT_SUCCESS(action) BOOST_REQUIRE_EQUAL((action), success())
 
 constexpr const char *long_text = "Lorem ipsum dolor sit amet, amet sint accusam sit te, te perfecto sadipscing vix, eam labore volumus dissentias ne. Est nonumy numquam fierent te. Te pri saperet disputando delicatissimi, pri semper ornatus ad. Paulo convenire argumentum cum te, te vix meis idque, odio tempor nostrum ius ad. Cu doctus mediocrem petentium his, eum sale errem timeam ne. Ludus debitis id qui, vix mucius antiopam ad. Facer signiferumque vis no, sale eruditi expetenda id ius.";
+constexpr size_t delegates_count = 21;
+constexpr size_t delegates_51 = delegates_count / 2 + 1;
 
 enum state_t {
     STATE_TSPEC_APP = 1,
@@ -217,7 +219,7 @@ class golos_worker_tester : public tester
     {
         produce_blocks();
 
-        for (int i = 0; i < 21; i++)
+        for (int i = 0; i < delegates_count; i++)
         {
             name delegate_name = string("delegate") + static_cast<char>('a' + i);
             delegates.push_back(delegate_name);
@@ -308,15 +310,14 @@ class golos_worker_tester : public tester
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_APP);
 
         // vote for the 0 technical specification application
-        for (size_t i = 0; i < delegates.size(); i++)
+        for (size_t i = 0; i < delegates_51; i++)
         {
             const name &delegate = delegates[i];
 
-            ASSERT_SUCCESS(worker->push_action(delegate, N(votetspec), mvo()
+            ASSERT_SUCCESS(worker->push_action(delegate, N(approvetspec), mvo()
                 ("app_domain", app_domain)
                 ("tspec_app_id", tspec_app_id)
                 ("author", delegate.to_string())
-                ("vote", (i + 1) % 2)
                 ("comment_id", comment_id++)
                 ("comment", mvo()("text", "Lorem Ipsum"))));
         }
@@ -840,17 +841,16 @@ try
     // vote for the 0 technical specification application
     uint64_t tspec_app_id = 1;
     {
-        int i = 0;
-        for (const auto &account : delegates)
+        for (size_t i = 0; i < delegates_51; i++)
         {
-            ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()
+            const name& account = delegates[i];
+
+            ASSERT_SUCCESS(worker->push_action(account, N(approvetspec), mvo()
                 ("app_domain", app_domain)
                 ("tspec_app_id", tspec_app_id)
                 ("author", account)
-                ("vote", (i + 1) % 2)
                 ("comment_id", 100 + i)
                 ("comment", mvo()("text", "Lorem Ipsum"))));
-            i++;
         }
     }
 

@@ -94,7 +94,7 @@ private:
             });
         }
 
-        void del_all(uint64_t foreign_id) {
+        void erase_all(uint64_t foreign_id) {
             auto index = comments.template get_index<name("foreign")>();
             auto ptr = index.lower_bound(foreign_id);
             while (ptr != index.upper_bound(foreign_id)) {
@@ -121,7 +121,7 @@ private:
     struct voting_module_t {
         multi_index<TableName, vote_t, indexed_by<"foreign"_n, const_mem_fun<vote_t, uint64_t, &vote_t::get_secondary_1>>> votes;
 
-        voting_module_t(eosio::name code, uint64_t scope) : votes(code, scope) {}
+        voting_module_t(const eosio::name& code, uint64_t scope) : votes(code, scope) {}
 
         size_t count_positive(uint64_t foreign_id) const {
             auto index = votes.template get_index<name("foreign")>();
@@ -154,7 +154,7 @@ private:
             });
         }
 
-        void del_all(uint64_t foreign_id) {
+        void erase_all(uint64_t foreign_id) {
             auto index = votes.template get_index<name("foreign")>();
             auto ptr = index.lower_bound(foreign_id);
             while (ptr != index.upper_bound(foreign_id)) {
@@ -162,6 +162,38 @@ private:
                 ptr++;
                 votes.erase(votes.get(id));
             }
+        }
+
+        void erase(uint64_t foreign_id, const eosio::name &voter) {
+            auto index = votes.template get_index<name("foreign")>();
+            for (auto ptr = index.lower_bound(foreign_id); ptr != index.upper_bound(foreign_id); ptr++) {
+                if (ptr->voter == voter) {
+                    votes.erase(votes.get(ptr->id));
+                    break;
+                }
+            }
+        }
+    };
+
+    template <eosio::name::raw TableName>
+    struct approve_module_t: protected voting_module_t<TableName> {
+        using voting_module_t<TableName>::count_positive;
+        using voting_module_t<TableName>::erase_all;
+
+        approve_module_t(const eosio::name& code, uint64_t scope): voting_module_t<TableName>::voting_module_t(code, scope) {}
+
+        void approve(uint64_t foreign_id, const eosio::name &approver) {
+            vote_t v {
+                .voter = approver,
+                .positive = true,
+                .foreign_id = foreign_id
+            };
+
+            voting_module_t<TableName>::vote(v);
+        }
+
+        void unapprove(uint64_t foreign_id, const eosio::name &approver) {
+            voting_module_t<TableName>::erase(foreign_id, approver);
         }
     };
 
@@ -305,7 +337,7 @@ private:
 
     comments_module_t<"proposalsc"_n> _proposal_comments;
     voting_module_t<"proposalsv"_n> _proposal_votes;
-    voting_module_t<"proposalstsv"_n> _proposal_tspec_votes;
+    approve_module_t<"proposalstsv"_n> _proposal_tspec_votes;
     comments_module_t<"tspecappc"_n> _proposal_tspec_comments;
     comments_module_t<"statusc"_n> _proposal_status_comments;
     comments_module_t<"reviewc"_n> _proposal_review_comments;
@@ -406,8 +438,8 @@ protected:
     }
 
     void del_tspec(const tspec_app_t &tspec_app) {
-        _proposal_tspec_votes.del_all(tspec_app.id);
-        _proposal_tspec_comments.del_all(tspec_app.id);
+        _proposal_tspec_votes.erase_all(tspec_app.id);
+        _proposal_tspec_comments.erase_all(tspec_app.id);
         _proposal_tspecs.erase(tspec_app);
     }
 
@@ -597,10 +629,10 @@ public:
             eosio_assert(_proposal_tspec_votes.count_positive(tspec_ptr->id) == 0, "proposal contains partly-approved technical specification applications");
         }
 
-        _proposal_comments.del_all(proposal_id);
-        _proposal_review_comments.del_all(proposal_id);
-        _proposal_status_comments.del_all(proposal_id);
-        _proposal_votes.del_all(proposal_id);
+        _proposal_comments.erase_all(proposal_id);
+        _proposal_review_comments.erase_all(proposal_id);
+        _proposal_status_comments.erase_all(proposal_id);
+        _proposal_votes.erase_all(proposal_id);
 
         for (auto tspec_ptr = tspec_lower_bound; tspec_ptr != tspec_index.upper_bound(proposal_id); ) {
             del_tspec(*(tspec_ptr++));
@@ -758,7 +790,7 @@ public:
     }
 
     /**
-   * @brief votetspec votes for the technical specification application
+   * @brief approvetspec votes for the technical specification application
    * @param proposal_id proposal ID
    * @param tspec_app_id technical specification application
    * @param author voting account name
@@ -767,8 +799,8 @@ public:
    * @param comment attached comment data
    */
     [[eosio::action]]
-    void votetspec(tspec_id_t tspec_app_id, eosio::name author, uint8_t vote, comment_id_t comment_id, const comment_data_t &comment) {
-        LOG("tpsec.id: %, author: %, vote: %, comment.id: % comment.text: %", tspec_app_id, ACCOUNT_NAME_CSTR(author), (int)vote, comment_id, comment.text.c_str());
+    void approvetspec(tspec_id_t tspec_app_id, eosio::name author, comment_id_t comment_id, const comment_data_t &comment) {
+        LOG("tpsec.id: %, author: %, comment.id: % comment.text: %", tspec_app_id, ACCOUNT_NAME_CSTR(author), comment_id, comment.text.c_str());
 
         const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         proposal_id_t proposal_id = tspec_app.foreign_id;
@@ -785,16 +817,10 @@ public:
             _proposal_tspec_comments.add(comment_id, tspec_app_id, author, comment);
         }
 
-        vote_t v{
-            .voter = author,
-            .positive = vote != 0,
-            .foreign_id = tspec_app_id
-        };
+        _proposal_tspec_votes.approve(tspec_app_id, author);
 
-        _proposal_tspec_votes.vote(v);
-
-        size_t positive_votes_count = _proposal_tspec_votes.count_positive(tspec_app_id);
-        if (vote != 0 && positive_votes_count >= witness_count_51)
+        const size_t positive_votes_count = _proposal_tspec_votes.count_positive(tspec_app_id);
+        if (positive_votes_count >= witness_count_51)
         {
             //TODO: check that all voters are delegates in this moment
             LOG("technical specification % got % positive votes", tspec_app_id, positive_votes_count);
@@ -1093,5 +1119,5 @@ public:
 };
 } // namespace golos
 
-APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos2)(addpropos)(setfund)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(votetspec)(publishtspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw),
+APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos2)(addpropos)(setfund)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(publishtspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw),
                (transfer))
