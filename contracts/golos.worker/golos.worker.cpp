@@ -78,20 +78,18 @@ private:
 
         void del(comment_id_t id)
         {
-            const auto comment_ptr = comments.find(id);
-            eosio_assert(comment_ptr != comments.end(), "comment doesn't exist");
-            require_auth(comment_ptr->author);
-            comments.erase(comment_ptr);
+            const auto& comment = comments.get(id);
+            require_auth(comment.author);
+            comments.erase(comment);
         }
 
         void edit(comment_id_t id, const comment_data_t &data)
         {
             eosio_assert(!data.text.empty(), "nothing to change");
-            auto comment_ptr = comments.find(id);
-            eosio_assert(comment_ptr != comments.end(), "comment doesn't exist");
-            require_auth(comment_ptr->author);
+            const auto &comment = comments.get(id);
+            require_auth(comment.author);
 
-            comments.modify(comment_ptr, comment_ptr->author, [&](comment_t &obj) {
+            comments.modify(comment, comment.author, [&](comment_t &obj) {
                 obj.data.text = data.text;
             });
         }

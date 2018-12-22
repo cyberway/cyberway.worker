@@ -447,6 +447,15 @@ try
             ("data", mvo()
                 ("text", "Awesome!"))));
 
+        // ensure fail when adding comment with same id
+        BOOST_REQUIRE_EQUAL(worker->push_action(comment_author, N(addcomment), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("comment_id", comment_id)
+            ("author", comment_author)
+            ("data", mvo()
+                ("text", "Duplicate comment"))), wasm_assert_msg("comment exists"));
+
         BOOST_REQUIRE_EQUAL(worker->get_proposal_comment(name(app_domain), comment_id)["data"]["text"].as_string(), "Awesome!");
 
         ASSERT_SUCCESS(worker->push_action(comment_author, N(editcomment), mvo()
@@ -456,8 +465,19 @@ try
             ("data", mvo()
                 ("text", "Fine!"))));
 
+        // ensure fail when editing comment with empty text
+        BOOST_REQUIRE_EQUAL(worker->push_action(comment_author, N(editcomment), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("comment_id", comment_id)
+            ("data", mvo()
+                ("text", ""))), wasm_assert_msg("nothing to change"));
+
         BOOST_REQUIRE_EQUAL(worker->get_proposal_comment(name(app_domain), comment_id)["data"]["text"].as_string(), "Fine!");
     }
+
+    // check get_proposal_comments_count value is equal to comments_count after creating/editing comments
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_comments_count(name(app_domain)), comments_count);
 
     for (uint64_t i = 0; i < comments_count; i++) {
         const uint64_t comment_id = i;
@@ -468,7 +488,23 @@ try
             ("comment_id", comment_id)));
 
         BOOST_REQUIRE(worker->get_proposal_comment(name(app_domain), comment_id).is_null());
+
+        // ensure fail when deleting non-existing comment
+        BOOST_REQUIRE_EQUAL(worker->push_action(comment_author, N(delcomment), mvo()
+            ("app_domain", app_domain)
+            ("comment_id", comment_id)), wasm_assert_msg("unable to find key"));
+
+        // ensure fail when editing non-existing comment
+        BOOST_REQUIRE_EQUAL(worker->push_action(comment_author, N(editcomment), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("comment_id", comment_id)
+            ("data", mvo()
+                ("text", ""))), wasm_assert_msg("unable to find key"));
     }
+
+    // check get_proposal_comments_count value is equal to 0 after deleting comments
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_comments_count(name(app_domain)), 0);
 
     ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
         ("app_domain", app_domain)
