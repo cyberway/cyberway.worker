@@ -23,6 +23,8 @@ using mvo = fc::mutable_variant_object;
 #define ASSERT_SUCCESS(action) BOOST_REQUIRE_EQUAL((action), success())
 
 constexpr const char *long_text = "Lorem ipsum dolor sit amet, amet sint accusam sit te, te perfecto sadipscing vix, eam labore volumus dissentias ne. Est nonumy numquam fierent te. Te pri saperet disputando delicatissimi, pri semper ornatus ad. Paulo convenire argumentum cum te, te vix meis idque, odio tempor nostrum ius ad. Cu doctus mediocrem petentium his, eum sale errem timeam ne. Ludus debitis id qui, vix mucius antiopam ad. Facer signiferumque vis no, sale eruditi expetenda id ius.";
+constexpr size_t delegates_count = 21;
+constexpr size_t delegates_51 = delegates_count / 2 + 1;
 
 enum state_t {
     STATE_TSPEC_APP = 1,
@@ -80,12 +82,9 @@ class base_contract
         }
 
         const auto& idx = db.get_index<chain::key_value_index, chain::by_scope_primary>();
-
-        auto itr = idx.lower_bound( boost::make_tuple(t_id->id, 0) );
         size_t count = 0;
-        while (itr != idx.end() && itr->t_id == t_id->id) {
+        for (auto itr = idx.lower_bound(boost::make_tuple(t_id->id, 0)); itr != idx.end() && itr->t_id == t_id->id; itr++) {
             count++;
-            itr++;
         }
 
         return count;
@@ -95,21 +94,18 @@ class base_contract
         const auto& db = tester.control->db();
         const auto* t_id = db.find<chain::table_id_object, chain::by_code_scope_table>(boost::make_tuple( code_account, scope, table));
         if(!static_cast<bool>(t_id)) {
-            return 0;
+            return {};
         }
 
         const auto& idx = db.get_index<chain::key_value_index, chain::by_scope_primary>();
-
-        auto itr = idx.lower_bound( boost::make_tuple(t_id->id, 0) );
         vector<fc::variant> objects;
-        while (itr != idx.end() && itr->t_id == t_id->id) {
-           vector<char> data;
-           data.resize(itr->value.size());
+        for (auto itr = idx.lower_bound(boost::make_tuple(t_id->id, 0)); itr != idx.end() && itr->t_id == t_id->id; itr++) {
+           vector<char> data(itr->value.size());
            memcpy(data.data(), itr->value.data(), data.size());
            objects.push_back(abi_ser.binary_to_variant(struct_name, data, tester.abi_serializer_max_time));
         }
 
-        return std::move(objects);
+        return objects;
     }
 };
 
@@ -223,7 +219,7 @@ class golos_worker_tester : public tester
     {
         produce_blocks();
 
-        for (int i = 0; i < 21; i++)
+        for (int i = 0; i < delegates_count; i++)
         {
             name delegate_name = string("delegate") + static_cast<char>('a' + i);
             delegates.push_back(delegate_name);
@@ -314,15 +310,14 @@ class golos_worker_tester : public tester
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(name(app_domain), proposal_id), STATE_TSPEC_APP);
 
         // vote for the 0 technical specification application
-        for (size_t i = 0; i < delegates.size(); i++)
+        for (size_t i = 0; i < delegates_51; i++)
         {
             const name &delegate = delegates[i];
 
-            ASSERT_SUCCESS(worker->push_action(delegate, N(votetspec), mvo()
+            ASSERT_SUCCESS(worker->push_action(delegate, N(approvetspec), mvo()
                 ("app_domain", app_domain)
                 ("tspec_app_id", tspec_app_id)
                 ("author", delegate.to_string())
-                ("vote", (i + 1) % 2)
                 ("comment_id", comment_id++)
                 ("comment", mvo()("text", "Lorem Ipsum"))));
         }
@@ -453,6 +448,15 @@ try
             ("data", mvo()
                 ("text", "Awesome!"))));
 
+        // ensure fail when adding comment with same id
+        BOOST_REQUIRE_EQUAL(worker->push_action(comment_author, N(addcomment), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("comment_id", comment_id)
+            ("author", comment_author)
+            ("data", mvo()
+                ("text", "Duplicate comment"))), wasm_assert_msg("comment exists"));
+
         BOOST_REQUIRE_EQUAL(worker->get_proposal_comment(name(app_domain), comment_id)["data"]["text"].as_string(), "Awesome!");
 
         ASSERT_SUCCESS(worker->push_action(comment_author, N(editcomment), mvo()
@@ -462,8 +466,19 @@ try
             ("data", mvo()
                 ("text", "Fine!"))));
 
+        // ensure fail when editing comment with empty text
+        BOOST_REQUIRE_EQUAL(worker->push_action(comment_author, N(editcomment), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("comment_id", comment_id)
+            ("data", mvo()
+                ("text", ""))), wasm_assert_msg("nothing to change"));
+
         BOOST_REQUIRE_EQUAL(worker->get_proposal_comment(name(app_domain), comment_id)["data"]["text"].as_string(), "Fine!");
     }
+
+    // check get_proposal_comments_count value is equal to comments_count after creating/editing comments
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_comments_count(name(app_domain)), comments_count);
 
     for (uint64_t i = 0; i < comments_count; i++) {
         const uint64_t comment_id = i;
@@ -474,7 +489,23 @@ try
             ("comment_id", comment_id)));
 
         BOOST_REQUIRE(worker->get_proposal_comment(name(app_domain), comment_id).is_null());
+
+        // ensure fail when deleting non-existing comment
+        BOOST_REQUIRE_EQUAL(worker->push_action(comment_author, N(delcomment), mvo()
+            ("app_domain", app_domain)
+            ("comment_id", comment_id)), wasm_assert_msg("unable to find key"));
+
+        // ensure fail when editing non-existing comment
+        BOOST_REQUIRE_EQUAL(worker->push_action(comment_author, N(editcomment), mvo()
+            ("app_domain", app_domain)
+            ("proposal_id", proposal_id)
+            ("comment_id", comment_id)
+            ("data", mvo()
+                ("text", ""))), wasm_assert_msg("unable to find key"));
     }
+
+    // check get_proposal_comments_count value is equal to 0 after deleting comments
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_comments_count(name(app_domain)), 0);
 
     ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
         ("app_domain", app_domain)
@@ -539,6 +570,16 @@ try
 
     BOOST_REQUIRE_EQUAL(worker->get_proposal_votes_count(name(app_domain)), delegates.size());
 
+    auto votes = worker->get_table_rows(N(proposalsv), "vote_t", name(app_domain));
+    BOOST_REQUIRE_EQUAL(delegates.size(), votes.size());
+    // revote with the different `positive` value
+    for (size_t i = 0; i < delegates.size(); i++)
+    {
+        name &delegate = delegates[i];
+        fc::variant &vote = votes[i];
+
+        BOOST_REQUIRE_EQUAL(vote["positive"], i % 2);
+    }
 
     ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
         ("app_domain", app_domain)
@@ -551,6 +592,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(technical_specification_application_CUD, golos_worker_tester)
 try
 {
+    uint64_t comment_id = 0;
+
     for (uint64_t i = 0; i < 10; i++) {
         const uint64_t proposal_id = i;
         const name& proposal_author = members[i * 2];
@@ -604,6 +647,19 @@ try
             tspec_row = worker->get_tspec(name(app_domain), tspec_app_id);
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["specification_cost"].as_string(), "2.000 APP");
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["development_cost"].as_string(), "2.000 APP");
+
+            const name& approver = delegates[0];
+            ASSERT_SUCCESS(worker->push_action(approver, N(approvetspec), mvo()
+                ("app_domain", app_domain)
+                ("tspec_app_id", tspec_app_id)
+                ("author", approver)
+                ("comment_id", comment_id++)
+                ("comment", mvo()("text", "Lorem Ipsum"))));
+
+            ASSERT_SUCCESS(worker->push_action(approver, N(dapprovetspec), mvo()
+                ("app_domain", app_domain)
+                ("tspec_app_id", tspec_app_id)
+                ("author", approver)));
 
             ASSERT_SUCCESS(worker->push_action(tspec_author, N(deltspec), mvo()
                 ("app_domain", app_domain)
@@ -800,17 +856,16 @@ try
     // vote for the 0 technical specification application
     uint64_t tspec_app_id = 1;
     {
-        int i = 0;
-        for (const auto &account : delegates)
+        for (size_t i = 0; i < delegates_51; i++)
         {
-            ASSERT_SUCCESS(worker->push_action(account, N(votetspec), mvo()
+            const name& account = delegates[i];
+
+            ASSERT_SUCCESS(worker->push_action(account, N(approvetspec), mvo()
                 ("app_domain", app_domain)
                 ("tspec_app_id", tspec_app_id)
                 ("author", account)
-                ("vote", (i + 1) % 2)
                 ("comment_id", 100 + i)
                 ("comment", mvo()("text", "Lorem Ipsum"))));
-            i++;
         }
     }
 
