@@ -6,7 +6,7 @@ namespace eosio { namespace testing {
 struct contracts {
    static std::vector<uint8_t> golos_worker_wasm() { return read_wasm("${CMAKE_BINARY_DIR}/../golos.worker/golos.worker.wasm"); }
    static std::string          golos_worker_wast() { return read_wast("${CMAKE_BINARY_DIR}/../golos.worker/golos.worker.wast"); }
-   static std::vector<char>    golos_worker_abi() { return read_abi("${CMAKE_BINARY_DIR}/../golos.worker/golos.worker.final.abi"); }
+   static std::vector<char>    golos_worker_abi() { return read_abi("${CMAKE_BINARY_DIR}/../golos.worker/golos.worker.abi"); }
    static std::vector<uint8_t> token_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/../../eosio.contracts/build/eosio.token/eosio.token.wasm"); }
    static std::string          token_wast() { return read_wast("${CMAKE_CURRENT_SOURCE_DIR}/../../eosio.contracts/build/eosio.token/eosio.token.wast"); }
    static std::vector<char>    token_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/../../eosio.contracts/build/eosio.token/eosio.token.abi"); }
