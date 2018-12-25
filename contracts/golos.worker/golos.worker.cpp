@@ -750,7 +750,8 @@ public:
         const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
         LOG("proposal_id: %, tspec_id: %", proposal.id, tspec_app.id);
 
-        eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for edittspec");
+        eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP || 
+                     proposal.state == proposal_t::STATE_TSPEC_CREATE, "invalid state for edittspec");
         eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
 
         eosio_assert(get_state().token_symbol == tspec.specification_cost.symbol, "invalid symbol for the specification cost");
@@ -759,7 +760,7 @@ public:
         require_app_member(tspec_app.author);
 
         _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t &obj) {
-            obj.modify(tspec);
+            obj.modify(tspec, proposal.state == proposal_t::STATE_TSPEC_CREATE /* limited */);
         });
     }
 
@@ -843,28 +844,6 @@ public:
         eosio_assert(voting_time_s + tspec_app.created.to_time_point().sec_since_epoch() >= now(), "approve time is over");
 
         _proposal_tspec_votes.unapprove(tspec_app_id, author);
-    }
-
-    /**
-   * @brief publishtspec publish a final tehcnical specification
-   * @param proposal_id proposal ID
-   * @param data technical specification details
-   */
-    [[eosio::action]]
-    void publishtspec(proposal_id_t proposal_id, const tspec_data_t &data)
-    {
-        LOG("proposal_id: %", proposal_id);
-        auto proposal_ptr = get_proposal(proposal_id);
-        eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_CREATE, "invalid state for publishtspec");
-        eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
-
-        const tspec_app_t& tspec_app = _proposal_tspecs.get(proposal_ptr->tspec_id);
-        LOG("tspec_app.id: %, tspec_app.author: %", tspec_app.id, tspec_app.author);
-        require_auth(tspec_app.author);
-
-        _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t &obj) {
-            obj.data.update(data, true /* limited */);
-        });
     }
 
     /**
@@ -1132,7 +1111,7 @@ public:
 extern "C" {
    void apply(uint64_t receiver, uint64_t code, uint64_t action) {
          switch(action) {
-            EOSIO_DISPATCH_HELPER(golos::worker, (createpool)(addpropos2)(addpropos)(setfund)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(publishtspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)(transfer))
+            EOSIO_DISPATCH_HELPER(golos::worker, (createpool)(addpropos2)(addpropos)(setfund)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)(transfer))
         }
     }
 }
