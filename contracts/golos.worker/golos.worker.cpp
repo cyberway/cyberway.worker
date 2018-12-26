@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "external.hpp"
-#include "app_dispatcher.hpp"
 
 using namespace eosio;
 using namespace std;
@@ -26,7 +25,7 @@ using namespace std;
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #define ACCOUNT_NAME_CSTR(account_name) eosio::name(account_name).to_string().c_str()
-#define LOG(format, ...) print_f("%(%): " format "\n", __FUNCTION__, ACCOUNT_NAME_CSTR(_app), ##__VA_ARGS__);
+#define LOG(format, ...) print_f("%(%): " format "\n", __FUNCTION__, ACCOUNT_NAME_CSTR(_self), ##__VA_ARGS__);
 
 namespace golos
 {
@@ -343,8 +342,6 @@ private:
     comments_module_t<"reviewc"_n> _proposal_review_comments;
     voting_module_t<"proposalsrv"_n> _proposal_review_votes;
 
-    eosio::name _app;
-
 protected:
     auto get_state()
     {
@@ -442,21 +439,19 @@ protected:
         _proposal_tspec_comments.erase_all(tspec_app.id);
         _proposal_tspecs.erase(tspec_app);
     }
-
 public:
-    worker(eosio::name receiver, eosio::name code, eosio::name app) : contract(receiver, code, eosio::datastream<const char *>(nullptr, 0)),
-        _app(app),
-        _state(_self, app.value),
-        _proposals(_self, app.value),
-        _funds(_self, app.value),
-        _proposal_comments(_self, app.value),
-        _proposal_votes(_self, app.value),
-        _proposal_status_comments(_self, app.value),
-        _proposal_review_comments(_self, app.value),
-        _proposal_review_votes(_self, app.value),
-        _proposal_tspecs(_self, app.value),
-        _proposal_tspec_comments(_self, app.value),
-        _proposal_tspec_votes(_self, app.value){}
+    worker(eosio::name receiver, eosio::name code, eosio::datastream<const char *>& ds) : contract(receiver, code, ds),
+        _state(_self, _self.value),
+        _proposals(_self, _self.value),
+        _funds(_self, _self.value),
+        _proposal_comments(_self, _self.value),
+        _proposal_votes(_self, _self.value),
+        _proposal_status_comments(_self, _self.value),
+        _proposal_review_comments(_self, _self.value),
+        _proposal_review_votes(_self, _self.value),
+        _proposal_tspecs(_self, _self.value),
+        _proposal_tspec_comments(_self, _self.value),
+        _proposal_tspec_votes(_self, _self.value) {}
 
     /**
    * @brief createpool creates workers pool in the application domain
@@ -465,12 +460,13 @@ public:
     [[eosio::action]]
     void createpool(eosio::symbol token_symbol)
     {
-        LOG("creating worker's pool: code=\"%\" app=\"%\", token_symbol=\"%\"", name(_self).to_string().c_str(), name{_app}.to_string().c_str(), token_symbol);
+        LOG("creating worker's pool: token_symbol=\"%\"", token_symbol);
         eosio_assert(!_state.exists(), "workers pool is already initialized for the specified app domain");
-        require_auth(_app);
+        require_auth(_self);
 
         state_t state{.token_symbol = token_symbol};
-        _state.set(state, _app);
+        _state.set(state, _self);
+        LOG("created");
     }
 
     /**
@@ -481,7 +477,7 @@ public:
    * @param description proposal description
    */
     [[eosio::action]]
-    void addpropos(proposal_id_t proposal_id, eosio::name author, string title, string description) {
+    void addpropos(proposal_id_t proposal_id, const eosio::name& author, const string& title, const string& description) {
         require_app_member(author);
 
         LOG("adding propos % \"%\" by %", proposal_id, title.c_str(), ACCOUNT_NAME_CSTR(author));
@@ -492,13 +488,13 @@ public:
             o.author = author;
             o.title = title;
             o.description = description;
-            o.fund_name = _app;
+            o.fund_name = _self;
 
             o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
             o.created = TIMESTAMP_NOW;
             o.modified = TIMESTAMP_UNDEFINED;
         });
-        LOG("added");
+        LOG("added % % % %", ACCOUNT_NAME_CSTR(_self), ACCOUNT_NAME_CSTR(_code), _proposals.get(proposal_id).id);
     }
 
     /**
@@ -532,7 +528,7 @@ public:
             o.author = author;
             o.title = title;
             o.description = description;
-            o.fund_name = _app;
+            o.fund_name = _self;
             o.tspec_id = tspec_id;
             o.worker = worker;
             o.work_begining_time = TIMESTAMP_NOW;
@@ -1094,49 +1090,49 @@ public:
     }
 
     // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
-    static void transfer(eosio::name code, transfer_args & t)
+    void transfer(const transfer_args& t)
     {
-        print_f("%(%): transfer % from \"%\" to \"%\"\n", __FUNCTION__, t.memo.c_str(), t.quantity, ACCOUNT_NAME_CSTR(t.from), ACCOUNT_NAME_CSTR(t.to));
+        LOG("transfer % from \"%\" to \"%\"\n", t.quantity, ACCOUNT_NAME_CSTR(t.from), ACCOUNT_NAME_CSTR(t.to));
 
         if (t.memo.size() > 13 || t.to.value != current_receiver()) {
-            print_f("%(%): skiping transfer\n", __FUNCTION__, t.memo.c_str());
+            LOG("skiping transfer\n");
             return;
         }
 
-        worker self(eosio::name(current_receiver()), code, eosio::name(t.memo.c_str()));
-
-        if (t.quantity.symbol != self.get_state().token_symbol) {
-            print_f("%(%): invalid symbol code: %, expected: %\n", __FUNCTION__, t.memo.c_str(), t.quantity.symbol, self.get_state().token_symbol);
+        if (t.quantity.symbol != get_state().token_symbol) {
+            LOG("invalid symbol code: %, expected: %\n", t.quantity.symbol, get_state().token_symbol);
             return;
         }
 
-        if (t.to != self._self || code != TOKEN_ACCOUNT)
-        {
-            print_f("%(%): invalid beneficiary or contract code\n", __FUNCTION__, t.memo.c_str());
+        if (t.to != _self || get_code() != TOKEN_ACCOUNT) {
+            LOG("invalid beneficiary or contract code\n");
             return;
         }
 
         const eosio::name &ram_payer = t.to;
+        const name fund_name = name(t.memo);
 
-        auto fund = self._funds.find(t.from.value);
-        if (fund == self._funds.end())
-        {
-            self._funds.emplace(ram_payer, [&](auto &fund) {
-                fund.owner = t.from;
+        auto fund_ptr = _funds.find(fund_name.value);
+        if (fund_ptr == _funds.end()) {
+            _funds.emplace(ram_payer, [&](auto &fund) {
+                fund.owner = fund_name;
                 fund.quantity = t.quantity;
             });
-        }
-        else
-        {
-            self._funds.modify(fund, ram_payer, [&](auto &fund) {
+        } else {
+            _funds.modify(fund_ptr, ram_payer, [&](auto &fund) {
                 fund.quantity += t.quantity;
             });
         }
 
-        print_f("%(%): added % credits to % fund", __FUNCTION__, t.memo.c_str(), t.quantity, t.from.to_string().c_str());
+        LOG("added % credits to % fund", t.quantity, t.memo.c_str());
     }
 };
 } // namespace golos
 
-APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos2)(addpropos)(setfund)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(publishtspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw),
-               (transfer))
+extern "C" {
+   void apply(uint64_t receiver, uint64_t code, uint64_t action) {
+         switch(action) {
+            EOSIO_DISPATCH_HELPER(golos::worker, (createpool)(addpropos2)(addpropos)(setfund)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(publishtspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)(transfer))
+        }
+    }
+}
