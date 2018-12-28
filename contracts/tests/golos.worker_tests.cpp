@@ -4,7 +4,7 @@
 #include <eosio/chain/abi_serializer.hpp>
 #include <memory>
 #include "Runtime/Runtime.h"
-
+#include <iostream>
 #include <fc/variant_object.hpp>
 #include "contracts.hpp"
 
@@ -325,22 +325,23 @@ class golos_worker_tester : public tester
         /* ok,technical specification application has been choosen,
         now technical specification application author should publish
         a final technical specification */
-        BOOST_REQUIRE_EQUAL(worker->push_action(tspec_author, N(publishtspec), mvo()
-            ("proposal_id", proposal_id)
-            ("data", mvo()
+
+        BOOST_REQUIRE_EQUAL(worker->push_action(tspec_author, N(edittspec), mvo()
+            ("tspec_app_id", tspec_app_id)
+            ("tspec", mvo()
                 ("text", long_text)
-                ("specification_cost", "5.000 APP")
+                ("specification_cost", "10.000 APP")
                 ("specification_eta", 1)
-                ("development_cost", "5.000 APP")
+                ("development_cost", "10.000 APP")
                 ("development_eta", 1)
                 ("payments_count", 1)
                 ("payments_interval", 1))), wasm_assert_msg("cost can't be modified"));
 
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_CREATE);
 
-        ASSERT_SUCCESS(worker->push_action(tspec_author, N(publishtspec), mvo()
-            ("proposal_id", proposal_id)
-            ("data", mvo()
+        ASSERT_SUCCESS(worker->push_action(tspec_author, N(edittspec), mvo()
+            ("tspec_app_id", tspec_app_id)
+            ("tspec", mvo()
                 ("text", long_text)
                 ("specification_cost", "0.000 APP")
                 ("specification_eta", 1)
@@ -364,6 +365,8 @@ class golos_worker_tester : public tester
                 ("comment", mvo()
                     ("text", long_text))));
         }
+
+
     }
 };
 
@@ -831,9 +834,9 @@ try
     /* ok,technical specification application has been choosen,
     now technical specification application author should publish
     a final technical specification */
-    ASSERT_SUCCESS(worker->push_action(author_account, N(publishtspec), mvo()
-        ("proposal_id", proposal_id)
-        ("data", mvo()
+    ASSERT_SUCCESS(worker->push_action(author_account, N(edittspec), mvo()
+        ("tspec_app_id", tspec_app_id)
+        ("tspec", mvo()
             ("text", long_text)
             ("specification_cost", "0.000 APP")
             ("specification_eta", 1)
