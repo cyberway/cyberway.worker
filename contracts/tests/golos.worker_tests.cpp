@@ -275,6 +275,8 @@ class golos_worker_tester : public tester
         produce_blocks(1);
 
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), 1);
+        
+        BOOST_TEST_MESSAGE("adding tspec");
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
             ("proposal_id", proposal_id)
             ("tspec_app_id", tspec_app_id)
@@ -323,6 +325,7 @@ class golos_worker_tester : public tester
         /* ok,technical specification application has been choosen,
         now technical specification application author should publish
         a final technical specification */
+
         BOOST_REQUIRE_EQUAL(worker->push_action(tspec_author, N(edittspec), mvo()
             ("tspec_app_id", tspec_app_id)
             ("tspec", mvo()
@@ -347,7 +350,6 @@ class golos_worker_tester : public tester
                 ("payments_count", 1)
                 ("payments_interval", 1))));
 
-
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_CREATE);
 
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(startwork), mvo()
@@ -369,6 +371,7 @@ class golos_worker_tester : public tester
 };
 
 BOOST_AUTO_TEST_SUITE(eosio_worker_tests)
+
 
 BOOST_FIXTURE_TEST_CASE(proposal_CUD, golos_worker_tester)
 try
@@ -762,6 +765,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
+#
 BOOST_FIXTURE_TEST_CASE(sponsored_fund, golos_worker_tester)
 try
 {
@@ -1058,5 +1062,6 @@ try
     REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", initial_user_supply));
 }
 FC_LOG_AND_RETHROW()
+
 
 BOOST_AUTO_TEST_SUITE_END()
