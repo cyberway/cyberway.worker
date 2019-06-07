@@ -198,7 +198,6 @@ private:
 
     typedef uint64_t tspec_id_t;
     struct tspec_data_t {
-        string text;
         asset specification_cost;
         uint32_t specification_eta;
         asset development_cost;
@@ -206,18 +205,13 @@ private:
         uint16_t payments_count;
         uint32_t payments_interval;
 
-        EOSLIB_SERIALIZE(tspec_data_t, (text) \
+        EOSLIB_SERIALIZE(tspec_data_t,
             (specification_cost)(specification_eta) \
             (development_cost)(development_eta) \
             (payments_count)(payments_interval));
 
         void update(const tspec_data_t &that, bool limited) {
             bool modified = false;
-
-            if (!that.text.empty()) {
-                text = that.text;
-                modified = true;
-            }
 
             if (that.specification_cost.amount != 0) {
                 eosio_assert(!limited, "cost can't be modified");
@@ -296,8 +290,6 @@ private:
         eosio::name author;
         uint8_t type;
         uint8_t state;
-        string title;
-        string description;
         eosio::name fund_name;
         asset deposit;
         tspec_id_t tspec_id;
@@ -308,7 +300,7 @@ private:
         block_timestamp created;
         block_timestamp modified;
 
-        EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(state)(title)(description)\
+        EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(state)\
             (fund_name)(deposit)(tspec_id)\
             (worker)(work_begining_time)(worker_payments_count)\
             (payment_begining_time)(created)(modified));
@@ -486,8 +478,6 @@ public:
             o.id = proposal_id;
             o.type = proposal_t::TYPE_1;
             o.author = author;
-            o.title = title;
-            o.description = description;
             o.fund_name = _self;
 
             o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
@@ -501,10 +491,11 @@ public:
    * @brief addpropos2 publishs a new proposal for the done work
    * @param proposal_id proposal ID
    * @param author author of the proposal
+   * @param worker the party that did work
    * @param title proposal title
    * @param description proposal description
-   * @param specification proposal technical specification
-   * @param worker the party that did work
+   * @param tspec proposal technical specification
+   * @param tspec_text technical specification text
    */
     [[eosio::action]]
     void addpropos2(proposal_id_t proposal_id,
@@ -513,6 +504,7 @@ public:
                const string &title,
                const string &description,
                const tspec_data_t &tspec,
+               const string& tspec_text,
                const comment_id_t comment_id,
                const comment_data_t &comment)
     {
@@ -526,8 +518,6 @@ public:
             o.id = proposal_id;
             o.type = proposal_t::TYPE_2;
             o.author = author;
-            o.title = title;
-            o.description = description;
             o.fund_name = _self;
             o.tspec_id = tspec_id;
             o.worker = worker;
@@ -595,14 +585,7 @@ public:
         eosio_assert(!(description.empty() && title.empty()), "invalid arguments");
 
         _proposals.modify(proposal_ptr, proposal_ptr->author, [&](auto &o) {
-            if (!description.empty()) {
-                o.description = description;
-                o.modified = block_timestamp(now());
-            }
-            if (!title.empty()) {
-                o.title = title;
-                o.modified = block_timestamp(now());
-            }
+            o.modified = TIMESTAMP_NOW;
         });
     }
 
@@ -715,9 +698,10 @@ public:
    * @param tspec_id technical speification aplication ID
    * @param author author of the technical specification application
    * @param tspec technical specification details
+   * @param tspec_text technical specification text
    */
     [[eosio::action]]
-    void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, eosio::name author, const tspec_data_t &tspec)
+    void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, eosio::name author, const tspec_data_t &tspec, const string& tspec_text)
     {
         LOG("proposal_id: %, tspec_id: %, author: %", proposal_id, tspec_app_id, ACCOUNT_NAME_CSTR(author));
         auto proposal_ptr = get_proposal(proposal_id);
@@ -743,9 +727,10 @@ public:
    * @param tspec_app_id technical specification application ID
    * @param author author of the technical specification
    * @param tspec technical specification details
+   * @param tspec_text technical specification text
    */
     [[eosio::action]]
-    void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec) {
+    void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec, const string& tspec_text) {
         const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
         LOG("proposal_id: %, tspec_id: %", proposal.id, tspec_app.id);
