@@ -376,6 +376,8 @@ BOOST_AUTO_TEST_SUITE(eosio_worker_tests)
 BOOST_FIXTURE_TEST_CASE(proposal_CUD, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: proposal_CUD");
+
     for (uint64_t i = 0; i < 10; i++) {
         const uint64_t proposal_id = i;
         const name& author_account = members[i];
@@ -417,6 +419,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(comment_CUD, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: comment_CUD");
+
     const uint64_t proposal_id = 0;
 
     ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
@@ -501,6 +505,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(vote_CUD, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: vote_CUD");
+
     const uint64_t proposal_id = 0;
 
     ASSERT_SUCCESS(worker->push_action(members[0], N(addpropos), mvo()
@@ -567,9 +573,11 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(technical_specification_application_CUD, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(tspec_application_CUD, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: tspec_application_CUD");
+
     uint64_t comment_id = 0;
 
     for (uint64_t i = 0; i < 10; i++) {
@@ -651,6 +659,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(proposal_removal, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: proposal_removal");
+
     const uint64_t proposal_id = 0;
     const name& proposal_author = members[0];
     const name& tspec_author = members[1];
@@ -711,6 +721,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(application_fund, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: application_fund");
+
     for (uint64_t proposal_id = 0; proposal_id < 5; proposal_id++) {
         uint64_t comment_id = proposal_id  * 100;
 
@@ -769,6 +781,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(sponsored_fund, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: sponsored_fund");
+
     name sponsor_account = members[0];
     name author_account = members[1];
     name worker_account = members[2];
@@ -904,6 +918,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(developed_feature, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: developed_feature");
+
     name &author_account = members[0];
     name &worker_account = members[1];
     uint64_t proposal_id = 1;
@@ -962,6 +978,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(cancel_work_by_worker, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: cancel_work_by_worker");
+
     uint64_t proposal_id = 0;
     const name& proposal_author = members[proposal_id * 3];
     const name& tspec_author = members[proposal_id * 3 + 1];
@@ -995,6 +1013,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(cancel_work_by_tspec_author, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: cancel_work_by_tspec_author");
+
     uint64_t proposal_id = 0;
     const name& proposal_author = members[proposal_id * 3];
     const name& tspec_author = members[proposal_id * 3 + 1];
@@ -1027,6 +1047,8 @@ FC_LOG_AND_RETHROW()
 BOOST_FIXTURE_TEST_CASE(cancel_work_by_delegates, golos_worker_tester)
 try
 {
+    BOOST_TEST_MESSAGE("Testing: cancel_work_by_delegates");
+
     uint64_t proposal_id = 0;
     uint64_t comment_id = 0;
     const name& proposal_author = members[proposal_id * 3];
