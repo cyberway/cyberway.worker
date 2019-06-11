@@ -282,13 +282,13 @@ class golos_worker_tester : public tester
             ("tspec_app_id", tspec_app_id)
             ("author", tspec_author)
             ("tspec", mvo()
-                ("text", "Technical specification #1")
                 ("specification_cost", "5.000 APP")
                 ("specification_eta", 1)
                 ("development_cost", "5.000 APP")
                 ("development_eta", 1)
                 ("payments_count", 1)
-                ("payments_interval", 1))));
+                ("payments_interval", 1))
+            ("tspec_text", "Technical specification #1")));
 
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_APP);
 
@@ -296,13 +296,14 @@ class golos_worker_tester : public tester
             ("proposal_id", proposal_id)
             ("tspec_app_id", other_tspec_app_id)
             ("author", tspec_author)
-            ("tspec", mvo()("text", "Technical specification #2")
+            ("tspec", mvo()
                 ("specification_cost", "5.000 APP")
                 ("specification_eta", 1)
                 ("development_cost", "5.000 APP")
                 ("development_eta", 1)
                 ("payments_count", 2)
-                ("payments_interval", 1))));
+                ("payments_interval", 1))
+            ("tspec_text", "Technical specification #2")));
 
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_APP);
 
@@ -329,26 +330,26 @@ class golos_worker_tester : public tester
         BOOST_REQUIRE_EQUAL(worker->push_action(tspec_author, N(edittspec), mvo()
             ("tspec_app_id", tspec_app_id)
             ("tspec", mvo()
-                ("text", long_text)
                 ("specification_cost", "10.000 APP")
                 ("specification_eta", 1)
                 ("development_cost", "10.000 APP")
                 ("development_eta", 1)
                 ("payments_count", 1)
-                ("payments_interval", 1))), wasm_assert_msg("cost can't be modified"));
+                ("payments_interval", 1))
+            ("tspec_text", long_text)), wasm_assert_msg("cost can't be modified"));
 
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_CREATE);
 
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(edittspec), mvo()
             ("tspec_app_id", tspec_app_id)
             ("tspec", mvo()
-                ("text", long_text)
                 ("specification_cost", "0.000 APP")
                 ("specification_eta", 1)
                 ("development_cost", "0.000 APP")
                 ("development_eta", 1)
                 ("payments_count", 1)
-                ("payments_interval", 1))));
+                ("payments_interval", 1))
+            ("tspec_text", long_text)));
 
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_CREATE);
 
@@ -602,13 +603,13 @@ try
                 ("tspec_app_id", tspec_app_id)
                 ("author", tspec_author)
                 ("tspec", mvo()
-                    ("text", "Technical specification")
                     ("specification_cost", "1.000 APP")
                     ("specification_eta", 1)
                     ("development_cost", "1.000 APP")
                     ("development_eta", 1)
                     ("payments_count", 1)
-                    ("payments_interval", 1));
+                    ("payments_interval", 1))
+                ("tspec_text", "Technical specification");
 
             ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), tspec_app));
 
@@ -619,13 +620,13 @@ try
             ASSERT_SUCCESS(worker->push_action(tspec_author, N(edittspec), mvo()
                 ("tspec_app_id", tspec_app_id)
                 ("tspec", mvo()
-                    ("text", "Technical specification")
                     ("specification_cost", "2.000 APP")
                     ("specification_eta", 2)
                     ("development_cost", "2.000 APP")
                     ("development_eta", 2)
                     ("payments_count", 2)
-                    ("payments_interval", 2))));
+                    ("payments_interval", 2))
+                ("tspec_text", "Technical specification")));
 
             tspec_row = worker->get_tspec(worker_code_account, tspec_app_id);
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["specification_cost"].as_string(), "2.000 APP");
@@ -694,13 +695,13 @@ try
             ("tspec_app_id", tspec_app_id)
             ("author", tspec_author)
             ("tspec", mvo()
-                ("text", "Technical specification")
                 ("specification_cost", "1.000 APP")
                 ("specification_eta", 1)
                 ("development_cost", "1.000 APP")
                 ("development_eta", 1)
                 ("payments_count", 1)
-                ("payments_interval", 1));
+                ("payments_interval", 1))
+            ("tspec_text", "Technical specification");
 
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), tspec_app));
     }
@@ -807,25 +808,26 @@ try
         ("tspec_app_id", 1)
         ("author", author_account)
         ("tspec", mvo()
-            ("text", "Technical specification #1")
             ("specification_cost", "5.000 APP")
             ("specification_eta", 1)
             ("development_cost", "5.000 APP")
             ("development_eta", 1)
             ("payments_count", 1)
-            ("payments_interval", 1))));
+            ("payments_interval", 1))
+        ("tspec_text", "Technical specification #1")));
 
     ASSERT_SUCCESS(worker->push_action(author_account, N(addtspec), mvo()
         ("proposal_id", 1)
         ("tspec_app_id", 2)
         ("author", author_account)
-        ("tspec", mvo()("text", "Technical specification #2")
+        ("tspec", mvo()
             ("specification_cost", "2.000 APP")
             ("specification_eta", 1)
             ("development_cost", "2.000 APP")
             ("development_eta", 1)
             ("payments_count", 2)
-            ("payments_interval", 1))));
+            ("payments_interval", 1))
+        ("tspec_text", "Technical specification #2")));
 
     // vote for the 0 technical specification application
     uint64_t tspec_app_id = 1;
@@ -851,13 +853,13 @@ try
     ASSERT_SUCCESS(worker->push_action(author_account, N(edittspec), mvo()
         ("tspec_app_id", tspec_app_id)
         ("tspec", mvo()
-            ("text", long_text)
             ("specification_cost", "0.000 APP")
             ("specification_eta", 1)
             ("development_cost", "0.000 APP")
             ("development_eta", 1)
             ("payments_count", 1)
-            ("payments_interval", 1))));
+            ("payments_interval", 1))
+        ("tspec_text", long_text)));
 
     ASSERT_SUCCESS(worker->push_action(author_account, N(startwork), mvo()
         ("proposal_id", proposal_id)
@@ -932,7 +934,6 @@ try
         ("title", "Sponsored proposal #1")
         ("description", "Description #1")
         ("tspec", mvo()
-            ("text", long_text)
             ("specification_cost", "5.000 APP")
             ("specification_eta", 1)
             ("development_cost", "5.000 APP")
@@ -940,6 +941,7 @@ try
             ("payments_count", payments_count)
             ("payments_interval", 1)
         )
+        ("tspec_text", long_text)
         ("comment_id", 100)
         ("comment", mvo()
             ("text", long_text))
