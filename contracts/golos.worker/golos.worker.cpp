@@ -377,12 +377,7 @@ protected:
         eosio_assert(proposal.type == proposal_t::TYPE_1, "invalid state for choose_proposal_tspec");
         proposal.tspec_id = tspec_app.id;
         proposal.set_state(proposal_t::STATE_TSPEC_CREATE);
-
-        // funds can be deposited in setfund(), if not, it will be deposited here
-        if (proposal.deposit.amount == 0)
-        {
-            deposit(proposal);
-        }
+        deposit(proposal);
     }
 
     void pay_tspec_author(proposal_t & proposal)
@@ -540,34 +535,6 @@ public:
         });
 
         _proposal_status_comments.add(comment_id, proposal_id, author, comment);
-    }
-
-    /**
-   * @brief setfund sets a proposal fund
-   * @param proposal_id proposal ID
-   * @param fund_name the name of the fund: application domain fund (applicatoin domain name) or sponsored fund (account name)
-   * @param quantity amount of the tokens that will be deposited
-   */
-    [[eosio::action]]
-    void setfund(proposal_id_t proposal_id, eosio::name fund_name, asset quantity) {
-        auto proposal_ptr = _proposals.find(proposal_id);
-        eosio_assert(proposal_ptr != _proposals.end(), "proposal has not been found");
-        require_app_member(fund_name);
-        eosio_assert(get_state().token_symbol == quantity.symbol, "invalid symbol for setfund");
-        eosio_assert(proposal_ptr->deposit.amount == 0, "fund is already deposited");
-        eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for setfund");
-
-        const auto &fund = _funds.get(fund_name.value);
-        eosio_assert(fund.quantity >= quantity, "insufficient funds");
-
-        _proposals.modify(proposal_ptr, fund_name, [&](auto &o) {
-            o.fund_name = fund_name;
-            o.deposit = quantity;
-        });
-
-        _funds.modify(fund, fund_name, [&](auto &obj) {
-            obj.quantity -= quantity;
-        });
     }
 
     /**
@@ -1096,7 +1063,7 @@ public:
 extern "C" {
    void apply(uint64_t receiver, uint64_t code, uint64_t action) {
          switch(action) {
-            EOSIO_DISPATCH_HELPER(golos::worker, (createpool)(addpropos2)(addpropos)(setfund)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)(transfer))
+            EOSIO_DISPATCH_HELPER(golos::worker, (createpool)(addpropos2)(addpropos)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)(transfer))
         }
     }
 }
