@@ -251,6 +251,7 @@ private:
             STATE_WORK,
             STATE_DELEGATES_REVIEW,
             STATE_PAYMENT,
+            STATE_PAYMENT_COMPLETE,
             STATE_CLOSED
         };
 
@@ -417,14 +418,15 @@ protected:
         proposal.deposit = ZERO_ASSET;
     }
 
-    void close_tspec(name payer, const tspec_app_t& tspec_app, const proposal_t& proposal) {
-        if (proposal.state > proposal_t::STATE_TSPEC_APP) {    
+    void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal) {
+        if (state == tspec_app_t::STATE_CLOSED && proposal.state > proposal_t::STATE_TSPEC_APP) {
             _proposals.modify(proposal, payer, [&](proposal_t& proposal) {
                 proposal.set_state(proposal_t::STATE_TSPEC_APP);
+                // TODO: clear tspec_id
             });
         }
         _proposal_tspecs.modify(tspec_app, payer, [&](tspec_app_t& tspec) {
-            tspec.set_state(tspec_app_t::STATE_CLOSED);
+            tspec.set_state(state);
         });
     }
 
@@ -526,6 +528,7 @@ public:
             o.work_begining_time = TIMESTAMP_NOW;
             o.worker_payments_count = 0;
 
+            o.state = (uint8_t)proposal_t::STATE_TSPEC_CREATE;
             o.created = TIMESTAMP_NOW;
             o.modified = TIMESTAMP_UNDEFINED;
         });
@@ -860,7 +863,7 @@ public:
             refund(proposal, initiator);
         });
 
-        close_tspec(initiator, tspec_app, *proposal_ptr);
+        close_tspec(initiator, tspec_app, tspec_app_t::STATE_CLOSED, *proposal_ptr);
     }
 
    // TODO: refactor comments in special issue
@@ -944,7 +947,7 @@ public:
                     refund(proposal, reviewer);
                 });
 
-                close_tspec(reviewer, tspec, proposal);
+                close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED, proposal);
             }
         } else {
             eosio_assert(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW, "invalid state for positive review");
@@ -1019,7 +1022,7 @@ public:
         }
 
         if (proposal_ptr->worker_payments_count+1 == tspec.payments_count) {
-            close_tspec(proposal_ptr->worker, tspec_app, *proposal_ptr);
+            close_tspec(proposal_ptr->worker, tspec_app, tspec_app_t::STATE_PAYMENT_COMPLETE, *proposal_ptr);
         }
 
         _proposals.modify(proposal_ptr, proposal_ptr->worker, [&](proposal_t &proposal) {

@@ -41,6 +41,7 @@ enum tspec_state_t {
     STATE_WORK,
     STATE_DELEGATES_REVIEW,
     STATE_PAYMENT,
+    STATE_PAYMENT_COMPLETE,
     STATE_CLOSED
 };
 
@@ -778,7 +779,8 @@ try
         ASSERT_SUCCESS(worker->push_action(worker_account, N(withdraw), mvo()
             ("tspec_app_id", tspec_id)));
 
-        BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_CLOSED);
+        BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_PAYMENT_COMPLETE);
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_CREATE);
 
         auto worker_balance = token->get_account(worker_account, "3,APP");
         REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
@@ -839,7 +841,8 @@ try
             ("tspec_app_id", 0))); // addpropos2 uses available_primary_key
     }
 
-    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(0), STATE_CLOSED); // addpropos2 uses available_primary_key
+    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(0), STATE_PAYMENT_COMPLETE); // addpropos2 uses available_primary_key
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_CREATE);
 
    auto worker_balance = token->get_account(worker_account, "3,APP");
    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
@@ -869,10 +872,11 @@ try
         ("tspec_app_id", tspec_id)
         ("initiator", worker_account)));
 
+    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_APP);
+
     BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
         ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
-
-    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_CLOSED);
 
     // if proposal is closed deposit should be refunded to the application fund
     BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], app_fund_supply.to_string());
@@ -905,10 +909,12 @@ try
         ("tspec_app_id", tspec_id)
         ("initiator", tspec_author)));
 
+    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_APP);
+
     BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
         ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
 
-    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_CLOSED);
     // if proposal is closed deposit should be refunded to the application fund
     BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], app_fund_supply.to_string());
 
@@ -947,10 +953,12 @@ try
             ("comment", mvo()("text", "Lorem Ipsum"))));
     }
 
+    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_APP);
+
     BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
         ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
 
-    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_CLOSED);
     // if proposal is closed deposit should be refunded to the application fund
     BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], app_fund_supply.to_string());
 
