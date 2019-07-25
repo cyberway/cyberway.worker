@@ -30,12 +30,18 @@ constexpr const char *long_text = "Lorem ipsum dolor sit amet, amet sint accusam
 constexpr size_t delegates_count = 21;
 constexpr size_t delegates_51 = delegates_count / 2 + 1;
 
-enum state_t {
+enum proposal_state_t {
     STATE_TSPEC_APP = 1,
-    STATE_TSPEC_CREATE,
+    STATE_TSPEC_CREATE
+};
+
+enum tspec_state_t {
+    STATE_CREATED = 1,
+    STATE_APPROVED,
     STATE_WORK,
     STATE_DELEGATES_REVIEW,
     STATE_PAYMENT,
+    STATE_PAYMENT_COMPLETE,
     STATE_CLOSED
 };
 
@@ -163,21 +169,26 @@ class worker_contract : public base_contract
     {
     }
 
-    fc::variant get_proposal(name scope, uint64_t id) {
-        return base_contract::get_table_row(N(proposals), "proposal_t", scope, id);
+    fc::variant get_proposal(uint64_t id) {
+        return base_contract::get_table_row(N(proposals), "proposal_t", worker_code_account, id);
     }
 
-    uint8_t get_proposal_state(name scope, uint64_t proposal_id) {
-        auto proposal = get_proposal(scope, proposal_id);
+    uint8_t get_proposal_state(uint64_t proposal_id) {
+        auto proposal = get_proposal(proposal_id);
         return proposal["state"].as_int64();
+    }
+
+    uint8_t get_tspec_state(uint64_t tspec_app_id) {
+        auto tspec = get_tspec(tspec_app_id);
+        return tspec["state"].as_int64();
     }
 
     fc::variant get_state(name scope) {
         return base_contract::get_table_row(N(state), "state_t", scope, 0);
     }
 
-    fc::variant get_tspec(name scope, uint64_t id) {
-        return base_contract::get_table_row(N(tspecs), "tspec_app_t", scope, id);
+    fc::variant get_tspec(uint64_t id) {
+        return base_contract::get_table_row(N(tspecs), "tspec_app_t", worker_code_account, id);
     }
 
     fc::variant get_proposal_comment(name scope, uint64_t id) {
@@ -261,8 +272,7 @@ class golos_worker_tester : public tester
         BOOST_REQUIRE_EQUAL(fund["quantity"], app_fund_supply.to_string());
     }
 
-    void add_proposal(uint64_t proposal_id, const name& proposal_author, const name& tspec_author, const name& worker_account) {
-        const uint64_t tspec_app_id = proposal_id * 100;
+    void add_proposal(uint64_t proposal_id, const name& proposal_author, uint64_t tspec_app_id, const name& tspec_author, const name& worker_account) {
         const uint64_t other_tspec_app_id = tspec_app_id + 1;
         uint64_t comment_id = proposal_id  * 100;
 
@@ -274,7 +284,7 @@ class golos_worker_tester : public tester
 
         produce_blocks(1);
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), 1);
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), 1);
         
         BOOST_TEST_MESSAGE("adding tspec");
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
@@ -290,7 +300,7 @@ class golos_worker_tester : public tester
                 ("payments_interval", 1))
             ("tspec_text", "Technical specification #1")));
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_APP);
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), mvo()
             ("proposal_id", proposal_id)
@@ -305,7 +315,7 @@ class golos_worker_tester : public tester
                 ("payments_interval", 1))
             ("tspec_text", "Technical specification #2")));
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_APP);
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
         // vote for the 0 technical specification application
         for (size_t i = 0; i < delegates_51; i++)
@@ -319,9 +329,10 @@ class golos_worker_tester : public tester
                 ("comment", mvo()("text", "Lorem Ipsum"))));
         }
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_CREATE);
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_CREATE);
         // if technical specification application was upvoted, `proposal_deposit` should be deposited from the application fund
-        BOOST_REQUIRE_EQUAL(worker->get_proposal(worker_code_account, proposal_id)["deposit"], proposal_deposit.to_string());
+        BOOST_REQUIRE_EQUAL(worker->get_proposal(proposal_id)["deposit"], proposal_deposit.to_string());
+        BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_app_id), STATE_APPROVED);
 
         /* ok,technical specification application has been choosen,
         now technical specification application author should publish
@@ -338,7 +349,7 @@ class golos_worker_tester : public tester
                 ("payments_interval", 1))
             ("tspec_text", long_text)), wasm_assert_msg("cost can't be modified"));
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_CREATE);
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_CREATE);
 
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(edittspec), mvo()
             ("tspec_app_id", tspec_app_id)
@@ -351,13 +362,13 @@ class golos_worker_tester : public tester
                 ("payments_interval", 1))
             ("tspec_text", long_text)));
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_CREATE);
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_CREATE);
 
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(startwork), mvo()
-            ("proposal_id", proposal_id)
+            ("tspec_app_id", tspec_app_id)
             ("worker", worker_account)));
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_WORK);
+        BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_app_id), STATE_WORK);
 
         for (int i = 0; i < 5; i++) {
             ASSERT_SUCCESS(worker->push_action(worker_account, N(poststatus), mvo()
@@ -389,7 +400,7 @@ try
             ("title", "Proposal #1")
             ("description", "Description #1")));
         return;
-        auto proposal_row = worker->get_proposal(worker_code_account, proposal_id);
+        auto proposal_row = worker->get_proposal(proposal_id);
         BOOST_REQUIRE_EQUAL(proposal_row["state"], STATE_TSPEC_APP);
         BOOST_REQUIRE_EQUAL(proposal_row["title"], "Proposal #1");
         BOOST_REQUIRE_EQUAL(proposal_row["description"], "Description #1");
@@ -405,13 +416,13 @@ try
             ("title", "")
             ("description", "")), wasm_assert_msg("invalid arguments"));
 
-        proposal_row = worker->get_proposal(worker_code_account, proposal_id);
+        proposal_row = worker->get_proposal(proposal_id);
         BOOST_REQUIRE_EQUAL(proposal_row["title"], "New Proposal #1");
 
         ASSERT_SUCCESS(worker->push_action(author_account, N(delpropos), mvo()
             ("proposal_id", proposal_id)));
 
-        proposal_row = worker->get_proposal(worker_code_account, proposal_id);
+        proposal_row = worker->get_proposal(proposal_id);
         BOOST_REQUIRE(proposal_row.is_null());
     }
 }
@@ -499,7 +510,7 @@ try
     ASSERT_SUCCESS(worker->push_action(members[0], N(delpropos), mvo()
         ("proposal_id", proposal_id)));
 
-    BOOST_REQUIRE(worker->get_proposal(worker_code_account, proposal_id).is_null());
+    BOOST_REQUIRE(worker->get_proposal(proposal_id).is_null());
 }
 FC_LOG_AND_RETHROW()
 
@@ -593,7 +604,7 @@ try
             ("description", "Description #1"))
         );
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_APP);
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
         for (uint64_t j = 0; j < 1; j++) {
             const uint64_t tspec_app_id = 100 * i + j;
@@ -613,7 +624,7 @@ try
 
             ASSERT_SUCCESS(worker->push_action(tspec_author, N(addtspec), tspec_app));
 
-            auto tspec_row = worker->get_tspec(worker_code_account, tspec_app_id);
+            auto tspec_row = worker->get_tspec(tspec_app_id);
             BOOST_REQUIRE_EQUAL(tspec_row["id"].as_int64(), tspec_app_id);
             REQUIRE_MATCHING_OBJECT(tspec_row["data"], tspec_app["tspec"]);
 
@@ -628,7 +639,7 @@ try
                     ("payments_interval", 2))
                 ("tspec_text", "Technical specification")));
 
-            tspec_row = worker->get_tspec(worker_code_account, tspec_app_id);
+            tspec_row = worker->get_tspec(tspec_app_id);
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["specification_cost"].as_string(), "2.000 APP");
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["development_cost"].as_string(), "2.000 APP");
 
@@ -646,13 +657,13 @@ try
             ASSERT_SUCCESS(worker->push_action(tspec_author, N(deltspec), mvo()
                 ("tspec_app_id", tspec_app_id)));
 
-            BOOST_REQUIRE(worker->get_tspec(worker_code_account, tspec_app_id).is_null());
+            BOOST_REQUIRE(worker->get_tspec(tspec_app_id).is_null());
         }
 
         ASSERT_SUCCESS(worker->push_action(proposal_author, N(delpropos), mvo()
             ("proposal_id", proposal_id)));
 
-        BOOST_REQUIRE(worker->get_proposal(worker_code_account, proposal_id).is_null());
+        BOOST_REQUIRE(worker->get_proposal(proposal_id).is_null());
     }
 }
 FC_LOG_AND_RETHROW()
@@ -677,7 +688,7 @@ try
 
     BOOST_REQUIRE_EQUAL(worker->get_proposals_count(worker_code_account), 1);
 
-    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_TSPEC_APP);
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
     for (uint64_t j = 0; j < relative_rows_count; j++) {
         const uint64_t tspec_app_id = 100 + j;
@@ -725,13 +736,14 @@ try
     BOOST_TEST_MESSAGE("Testing: application_fund");
 
     for (uint64_t proposal_id = 0; proposal_id < 5; proposal_id++) {
+        uint64_t tspec_id = proposal_id * 100;
         uint64_t comment_id = proposal_id  * 100;
 
         const name& proposal_author = members[proposal_id * 3];
         const name& tspec_author = members[proposal_id * 3 + 1];
         const name& worker_account = members[proposal_id * 3 + 2];
 
-        add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
+        add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
         // revote for the proposal
         for (size_t i = 0; i < delegates.size(); i++)
@@ -745,29 +757,30 @@ try
         }
 
         ASSERT_SUCCESS(worker->push_action(tspec_author, N(acceptwork), mvo()
-            ("proposal_id", proposal_id)
+            ("tspec_app_id", tspec_id)
             ("comment_id", comment_id++)
             ("comment", mvo()
                 ("text", long_text))));
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_DELEGATES_REVIEW);
+        BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_DELEGATES_REVIEW);
 
         for (size_t i = 0; i < delegates.size(); i++) {
             const name &delegate = delegates[i];
             ASSERT_SUCCESS(worker->push_action(delegate, N(reviewwork), mvo()
-                ("proposal_id", proposal_id)
+                ("tspec_app_id", tspec_id)
                 ("reviewer", delegate.to_string())
                 ("status", (i + 1) % 2)
                 ("comment_id", comment_id++)
                 ("comment", mvo()("text", "Lorem Ipsum"))));
         }
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_PAYMENT);
+        BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_PAYMENT);
 
         ASSERT_SUCCESS(worker->push_action(worker_account, N(withdraw), mvo()
-            ("proposal_id", proposal_id)));
+            ("tspec_app_id", tspec_id)));
 
-        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_CLOSED);
+        BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_PAYMENT_COMPLETE);
+        BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_CREATE);
 
         auto worker_balance = token->get_account(worker_account, "3,APP");
         REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
@@ -808,12 +821,12 @@ try
             ("text", long_text))
         ));
 
-    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_DELEGATES_REVIEW);
+    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(0), STATE_DELEGATES_REVIEW); // addpropos2 uses available_primary_key
 
     int i = 0;
     for (const auto &account : delegates) {
         ASSERT_SUCCESS(worker->push_action(account, N(reviewwork), mvo()
-            ("proposal_id", proposal_id)
+            ("tspec_app_id", 0) // addpropos2 uses available_primary_key
             ("reviewer", account.to_string())
             ("status", (i + 1) % 2)
             ("comment_id", 500 + i)
@@ -821,14 +834,15 @@ try
         i++;
     }
 
-    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_PAYMENT);
+    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(0), STATE_PAYMENT); // addpropos2 uses available_primary_key
 
     for (int i = 0; i < payments_count; i++) {
         ASSERT_SUCCESS(worker->push_action(worker_account, N(withdraw), mvo()
-            ("proposal_id", 1)));
+            ("tspec_app_id", 0))); // addpropos2 uses available_primary_key
     }
 
-    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(0), STATE_PAYMENT_COMPLETE); // addpropos2 uses available_primary_key
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_CREATE);
 
    auto worker_balance = token->get_account(worker_account, "3,APP");
    REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
@@ -844,23 +858,25 @@ try
     BOOST_TEST_MESSAGE("Testing: cancel_work_by_worker");
 
     uint64_t proposal_id = 0;
+    uint64_t tspec_id = 0;
     const name& proposal_author = members[proposal_id * 3];
     const name& tspec_author = members[proposal_id * 3 + 1];
     const name& worker_account = members[proposal_id * 3 + 2];
 
-    add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
+    add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
     // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CREATE`, `STATE_WORK`
     BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - proposal_deposit).to_string());
 
     ASSERT_SUCCESS(worker->push_action(worker_account, N(cancelwork), mvo()
-        ("proposal_id", proposal_id)
+        ("tspec_app_id", tspec_id)
         ("initiator", worker_account)));
 
-    BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
-        ("proposal_id", proposal_id)), wasm_assert_msg("invalid state for withdraw"));
+    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
-    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
+        ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
 
     // if proposal is closed deposit should be refunded to the application fund
     BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], app_fund_supply.to_string());
@@ -879,23 +895,26 @@ try
     BOOST_TEST_MESSAGE("Testing: cancel_work_by_tspec_author");
 
     uint64_t proposal_id = 0;
+    uint64_t tspec_id = 0;
     const name& proposal_author = members[proposal_id * 3];
     const name& tspec_author = members[proposal_id * 3 + 1];
     const name& worker_account = members[proposal_id * 3 + 2];
 
-    add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
+    add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
     // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CREATE`, `STATE_WORK`
     BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - proposal_deposit).to_string());
 
     ASSERT_SUCCESS(worker->push_action(tspec_author, N(cancelwork), mvo()
-        ("proposal_id", proposal_id)
+        ("tspec_app_id", tspec_id)
         ("initiator", tspec_author)));
 
-    BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
-        ("proposal_id", proposal_id)), wasm_assert_msg("invalid state for withdraw"));
+    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
-    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
+        ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
+
     // if proposal is closed deposit should be refunded to the application fund
     BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], app_fund_supply.to_string());
 
@@ -913,12 +932,13 @@ try
     BOOST_TEST_MESSAGE("Testing: cancel_work_by_delegates");
 
     uint64_t proposal_id = 0;
+    uint64_t tspec_id = 0;
     uint64_t comment_id = 0;
     const name& proposal_author = members[proposal_id * 3];
     const name& tspec_author = members[proposal_id * 3 + 1];
     const name& worker_account = members[proposal_id * 3 + 2];
 
-    add_proposal(proposal_id, proposal_author, tspec_author, worker_account);
+    add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
     // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CREATE`, `STATE_WORK`
     BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - proposal_deposit).to_string());
@@ -926,17 +946,19 @@ try
     for (size_t i = 0; i < delegates.size() * 3 / 4 + 1; i++) {
         const name &delegate = delegates[i];
         ASSERT_SUCCESS(worker->push_action(delegate, N(reviewwork), mvo()
-            ("proposal_id", proposal_id)
+            ("tspec_app_id", tspec_id)
             ("reviewer", delegate)
             ("status", 0)
             ("comment_id", comment_id++)
             ("comment", mvo()("text", "Lorem Ipsum"))));
     }
 
-    BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
-        ("proposal_id", proposal_id)), wasm_assert_msg("invalid state for withdraw"));
+    BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
-    BOOST_REQUIRE_EQUAL(worker->get_proposal_state(worker_code_account, proposal_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker->push_action(worker_account, N(withdraw), mvo()
+        ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
+
     // if proposal is closed deposit should be refunded to the application fund
     BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], app_fund_supply.to_string());
 
