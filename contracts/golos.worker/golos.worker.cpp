@@ -281,7 +281,7 @@ private:
     struct [[eosio::table]] proposal_t {
         enum state_t {
             STATE_TSPEC_APP = 1,
-            STATE_TSPEC_CREATE
+            STATE_TSPEC_CHOSE
         };
 
         enum review_status_t {
@@ -290,8 +290,8 @@ private:
         };
 
         enum type_t {
-            TYPE_1,
-            TYPE_2
+            TYPE_TASK,
+            TYPE_DONE
         };
 
         proposal_id_t id;
@@ -382,9 +382,9 @@ protected:
 
     void choose_proposal_tspec(proposal_t & proposal, const tspec_app_t &tspec_app)
     {
-        eosio_assert(proposal.type == proposal_t::TYPE_1, "invalid state for choose_proposal_tspec");
+        eosio_assert(proposal.type == proposal_t::TYPE_TASK, "invalid state for choose_proposal_tspec");
         proposal.tspec_id = tspec_app.id;
-        proposal.set_state(proposal_t::STATE_TSPEC_CREATE);
+        proposal.set_state(proposal_t::STATE_TSPEC_CHOSE);
         deposit(proposal);
     }
 
@@ -480,7 +480,7 @@ public:
 
         _proposals.emplace(author, [&](auto &o) {
             o.id = proposal_id;
-            o.type = proposal_t::TYPE_1;
+            o.type = proposal_t::TYPE_TASK;
             o.author = author;
             o.fund_name = _self;
 
@@ -492,7 +492,7 @@ public:
     }
 
     /**
-   * @brief addpropos2 publishs a new proposal for the done work
+   * @brief addproposdn publishs a new proposal for the done work
    * @param proposal_id proposal ID
    * @param author author of the proposal
    * @param worker the party that did work
@@ -502,7 +502,7 @@ public:
    * @param tspec_text technical specification text
    */
     [[eosio::action]]
-    void addpropos2(proposal_id_t proposal_id,
+    void addproposdn(proposal_id_t proposal_id,
                const eosio::name &author,
                const eosio::name &worker,
                const string &title,
@@ -520,7 +520,7 @@ public:
 
         _proposals.emplace(author, [&](proposal_t &o) {
             o.id = proposal_id;
-            o.type = proposal_t::TYPE_2;
+            o.type = proposal_t::TYPE_DONE;
             o.author = author;
             o.fund_name = _self;
             o.tspec_id = tspec_id;
@@ -528,7 +528,7 @@ public:
             o.work_begining_time = TIMESTAMP_NOW;
             o.worker_payments_count = 0;
 
-            o.state = (uint8_t)proposal_t::STATE_TSPEC_CREATE;
+            o.state = (uint8_t)proposal_t::STATE_TSPEC_CHOSE;
             o.created = TIMESTAMP_NOW;
             o.modified = TIMESTAMP_UNDEFINED;
         });
@@ -574,7 +574,7 @@ public:
     void delpropos(proposal_id_t proposal_id) {
         auto proposal_ptr = get_proposal(proposal_id);
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for delpropos");
-        eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
         require_app_member(proposal_ptr->author);
 
         auto tspec_index = _proposal_tspecs.get_index<"foreign"_n>();
@@ -682,7 +682,7 @@ public:
     {
         LOG("proposal_id: %, tspec_id: %, author: %", proposal_id, tspec_app_id, ACCOUNT_NAME_CSTR(author));
         auto proposal_ptr = get_proposal(proposal_id);
-        eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
         eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for addtspec");
 
         eosio_assert(get_state().token_symbol == tspec.specification_cost.symbol, "invalid symbol for the specification cost");
@@ -713,8 +713,8 @@ public:
         LOG("proposal_id: %, tspec_id: %", proposal.id, tspec_app.id);
 
         eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP || 
-                     proposal.state == proposal_t::STATE_TSPEC_CREATE, "invalid state for edittspec");
-        eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
+                     proposal.state == proposal_t::STATE_TSPEC_CHOSE, "invalid state for edittspec");
+        eosio_assert(proposal.type == proposal_t::TYPE_TASK, "unsupported action");
 
         eosio_assert(get_state().token_symbol == tspec.specification_cost.symbol, "invalid symbol for the specification cost");
         eosio_assert(get_state().token_symbol == tspec.development_cost.symbol, "invalid symbol for the development cost");
@@ -722,7 +722,7 @@ public:
         require_app_member(tspec_app.author);
 
         _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t &obj) {
-            obj.modify(tspec, proposal.state == proposal_t::STATE_TSPEC_CREATE /* limited */);
+            obj.modify(tspec, proposal.state == proposal_t::STATE_TSPEC_CHOSE /* limited */);
         });
     }
 
@@ -736,7 +736,7 @@ public:
     {
         const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
-        eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal.type == proposal_t::TYPE_TASK, "unsupported action");
         eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for deltspec");
         eosio_assert(_proposal_tspec_votes.count_positive(tspec_app_id) == 0, "upvoted technical specification application can be removed");
 
@@ -765,7 +765,7 @@ public:
         const proposal_t &proposal = _proposals.get(proposal_id);
 
         eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for approvetspec");
-        eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal.type == proposal_t::TYPE_TASK, "unsupported action");
 
         require_app_delegate(author);
         eosio_assert(voting_time_s + tspec_app.created.to_time_point().sec_since_epoch() >= now(), "approve time is over");
@@ -803,7 +803,7 @@ public:
         const proposal_t &proposal = _proposals.get(proposal_id);
 
         eosio_assert(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for dapprovetspec");
-        eosio_assert(proposal.type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal.type == proposal_t::TYPE_TASK, "unsupported action");
 
         require_auth(author);
         eosio_assert(voting_time_s + tspec_app.created.to_time_point().sec_since_epoch() >= now(), "approve time is over");
@@ -824,7 +824,7 @@ public:
         eosio_assert(tspec_app.state == tspec_app_t::STATE_APPROVED, "invalid state for startwork");
 
         auto proposal_ptr = get_proposal(tspec_app.foreign_id);
-        eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
 
         _proposals.modify(proposal_ptr, tspec_app.author, [&](proposal_t &proposal) {
             proposal.worker = worker;
@@ -848,7 +848,7 @@ public:
         const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
         eosio_assert(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for cancelwork");
         auto proposal_ptr = get_proposal(tspec_app.foreign_id);
-        eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
 
         if (initiator == proposal_ptr->worker)
         {
@@ -879,7 +879,7 @@ public:
         auto proposal_ptr = get_proposal(proposal_id);
         const auto& tspec_app = _proposal_tspecs.get(proposal_ptr->tspec_id);
         eosio_assert(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for poststatus");
-        eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
         require_auth(proposal_ptr->worker);
         _proposal_status_comments.add(comment_id, proposal_ptr->id, proposal_ptr->worker, comment);
     }
@@ -900,7 +900,7 @@ public:
         eosio_assert(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for acceptwork");
 
         auto proposal_ptr = get_proposal(tspec_app.foreign_id);
-        eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+        eosio_assert(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
 
         _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](auto& tspec) {
             tspec.set_state(tspec_app_t::STATE_DELEGATES_REVIEW);
@@ -959,7 +959,7 @@ public:
                 LOG("work has been accepted by the delegates voting, got % positive votes", positive_votes_count);
 
                 _proposals.modify(proposal, reviewer, [&](proposal_t& proposal) {
-                    if (proposal.deposit.amount == 0 && proposal.type == proposal_t::TYPE_2) {
+                    if (proposal.deposit.amount == 0 && proposal.type == proposal_t::TYPE_DONE) {
                         deposit(proposal);
                     }
 
@@ -1080,7 +1080,7 @@ public:
 extern "C" {
    void apply(uint64_t receiver, uint64_t code, uint64_t action) {
          switch(action) {
-            EOSIO_DISPATCH_HELPER(golos::worker, (createpool)(addpropos2)(addpropos)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)(transfer))
+            EOSIO_DISPATCH_HELPER(golos::worker, (createpool)(addproposdn)(addpropos)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)(transfer))
         }
     }
 }
