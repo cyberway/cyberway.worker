@@ -1,8 +1,8 @@
 #pragma once
 
-#include <eosiolib/eosio.hpp>
-#include <eosiolib/action.hpp>
-#include <eosiolib/asset.hpp>
+#include <eosio/eosio.hpp>
+#include <eosio/action.hpp>
+#include <eosio/asset.hpp>
 #include <string>
 
 static int constexpr witness_count = 21;
