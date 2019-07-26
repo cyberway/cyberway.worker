@@ -3,12 +3,20 @@
 
 namespace eosio { namespace testing {
 
+#define GOLOS_CONTRACTS "${CMAKE_BINARY_DIR}/../"
+#define CYBERWAY_CONTRACTS "${CMAKE_BINARY_DIR}/../../../cyberway.contracts/build/"
+
+const std::string golos_contracts = getenv("GOLOS_CONTRACTS") ?: GOLOS_CONTRACTS;
+const std::string cyberway_contracts = getenv("CYBERWAY_CONTRACTS") ?: CYBERWAY_CONTRACTS;
+
+static inline std::vector<uint8_t> read_wasm(const std::string& filename) {return read_wasm(filename.c_str());}
+static inline std::vector<char> read_abi(const std::string& filename) {return read_abi(filename.c_str());}
+
 struct contracts {
-   static std::vector<uint8_t> golos_worker_wasm() { return read_wasm("${CMAKE_BINARY_DIR}/../golos.worker/golos.worker.wasm"); }
-   static std::string          golos_worker_wast() { return read_wast("${CMAKE_BINARY_DIR}/../golos.worker/golos.worker.wast"); }
-   static std::vector<char>    golos_worker_abi() { return read_abi("${CMAKE_BINARY_DIR}/../golos.worker/golos.worker.abi"); }
-   static std::vector<uint8_t> token_wasm() { return read_wasm("${CMAKE_CURRENT_SOURCE_DIR}/../../eosio.contracts/build/eosio.token/eosio.token.wasm"); }
-   static std::string          token_wast() { return read_wast("${CMAKE_CURRENT_SOURCE_DIR}/../../eosio.contracts/build/eosio.token/eosio.token.wast"); }
-   static std::vector<char>    token_abi() { return read_abi("${CMAKE_CURRENT_SOURCE_DIR}/../../eosio.contracts/build/eosio.token/eosio.token.abi"); }
+    static std::vector<uint8_t> worker_wasm() { return read_wasm(golos_contracts + "/golos.worker/golos.worker.wasm"); }
+    static std::vector<char>    worker_abi() { return read_abi(golos_contracts + "/golos.worker/golos.worker.abi"); }
+
+    static std::vector<uint8_t> token_wasm()  { return read_wasm(cyberway_contracts + "/cyber.token/cyber.token.wasm"); }
+    static std::vector<char>    token_abi()   { return read_abi (cyberway_contracts + "/cyber.token/cyber.token.abi"); }
 };
 }} //ns eosio::testing
