@@ -255,15 +255,27 @@ private:
             STATE_CLOSED
         };
 
+        enum review_status_t {
+            STATUS_REJECT = 0,
+            STATUS_ACCEPT = 1
+        };
+
         tspec_id_t id;
         tspec_id_t foreign_id;
         eosio::name author;
         uint8_t state;
         tspec_data_t data;
+        eosio::name fund_name;
+        asset deposit;
+        eosio::name worker;
+        block_timestamp work_begining_time;
+        uint8_t worker_payments_count;
+        block_timestamp payment_begining_time;
         block_timestamp created;
         block_timestamp modified;
 
-        EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(state)(data)(created)(modified));
+        EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(state)(data)(fund_name)(deposit)\
+            (worker)(work_begining_time)(worker_payments_count)(payment_begining_time)(created)(modified));
 
         void modify(const tspec_data_t &that, bool limited = false) {
             data.update(that, limited);
@@ -284,11 +296,6 @@ private:
             STATE_TSPEC_CREATE
         };
 
-        enum review_status_t {
-            STATUS_REJECT = 0,
-            STATUS_ACCEPT = 1
-        };
-
         enum type_t {
             TYPE_1,
             TYPE_2
@@ -298,20 +305,11 @@ private:
         eosio::name author;
         uint8_t type;
         uint8_t state;
-        eosio::name fund_name;
-        asset deposit;
         tspec_id_t tspec_id;
-        eosio::name worker;
-        block_timestamp work_begining_time;
-        uint8_t worker_payments_count;
-        block_timestamp payment_begining_time;
         block_timestamp created;
         block_timestamp modified;
 
-        EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(state)\
-            (fund_name)(deposit)(tspec_id)\
-            (worker)(work_begining_time)(worker_payments_count)\
-            (payment_begining_time)(created)(modified));
+        EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(state)(tspec_id)(created)(modified));
 
         uint64_t primary_key() const { return id; }
         void set_state(state_t new_state) { state = new_state; }
@@ -367,14 +365,13 @@ protected:
         return proposal;
     }
 
-    void deposit(proposal_t &proposal) {
-        const tspec_data_t &tspec = _proposal_tspecs.get(proposal.tspec_id).data;
-        const asset budget = tspec.development_cost + tspec.specification_cost;
-        const auto &fund = _funds.get(proposal.fund_name.value);
-        LOG("proposal.id: %, budget: %, fund: %", proposal.id, budget, proposal.fund_name);
+    void deposit(tspec_app_t& tspec_app) {
+        const asset budget = tspec_app.data.development_cost + tspec_app.data.specification_cost;
+        const auto &fund = _funds.get(tspec_app.fund_name.value);
+        LOG("tspec_app.id: %, budget: %, fund: %", tspec_app.id, budget, tspec_app.fund_name);
         eosio_assert(budget <= fund.quantity, "insufficient funds");
 
-        proposal.deposit = budget;
+        tspec_app.deposit = budget;
         _funds.modify(fund, name(), [&](auto &obj) {
             obj.quantity -= budget;
         });
@@ -385,16 +382,14 @@ protected:
         eosio_assert(proposal.type == proposal_t::TYPE_1, "invalid state for choose_proposal_tspec");
         proposal.tspec_id = tspec_app.id;
         proposal.set_state(proposal_t::STATE_TSPEC_CREATE);
-        deposit(proposal);
     }
 
-    void pay_tspec_author(proposal_t & proposal)
+    void pay_tspec_author(tspec_app_t& tspec_app)
     {
-        const tspec_app_t& tspec_app = _proposal_tspecs.get(proposal.tspec_id);
-        const tspec_data_t& tspec = tspec_app.data;
+        const auto& tspec = tspec_app.data;
 
         LOG("paying % to %", tspec.specification_cost, ACCOUNT_NAME_CSTR(tspec_app.author));
-        proposal.deposit -= tspec.specification_cost;
+        tspec_app.deposit -= tspec.specification_cost;
 
         action(permission_level{_self, "active"_n},
                TOKEN_ACCOUNT,
@@ -405,17 +400,19 @@ protected:
                 .send();
     }
 
-    void refund(proposal_t & proposal, eosio::name modifier)
+    void refund(tspec_app_t& tspec_app, eosio::name modifier)
     {
-        eosio_assert(proposal.deposit.amount > 0, "no funds were deposited");
+        if (tspec_app.deposit.amount == 0) {
+            return;
+        }
 
-        const auto &fund = _funds.get(proposal.fund_name.value);
-        LOG("% to % fund", proposal.deposit, ACCOUNT_NAME_CSTR(fund.owner));
+        const auto& fund = _funds.get(tspec_app.fund_name.value);
+        LOG("% to % fund", tspec_app.deposit, ACCOUNT_NAME_CSTR(fund.owner));
         _funds.modify(fund, modifier, [&](auto &obj) {
-            obj.quantity += proposal.deposit;
+            obj.quantity += tspec_app.deposit;
         });
 
-        proposal.deposit = ZERO_ASSET;
+        tspec_app.deposit = ZERO_ASSET;
     }
 
     void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal) {
@@ -427,6 +424,7 @@ protected:
         }
         _proposal_tspecs.modify(tspec_app, payer, [&](tspec_app_t& tspec) {
             tspec.set_state(state);
+            refund(tspec, payer);
         });
     }
 
@@ -482,7 +480,6 @@ public:
             o.id = proposal_id;
             o.type = proposal_t::TYPE_1;
             o.author = author;
-            o.fund_name = _self;
 
             o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
             o.created = TIMESTAMP_NOW;
@@ -522,11 +519,7 @@ public:
             o.id = proposal_id;
             o.type = proposal_t::TYPE_2;
             o.author = author;
-            o.fund_name = _self;
             o.tspec_id = tspec_id;
-            o.worker = worker;
-            o.work_begining_time = TIMESTAMP_NOW;
-            o.worker_payments_count = 0;
 
             o.state = (uint8_t)proposal_t::STATE_TSPEC_CREATE;
             o.created = TIMESTAMP_NOW;
@@ -538,6 +531,10 @@ public:
             obj.foreign_id = proposal_id;
             obj.author = author;
             obj.data = tspec;
+            obj.fund_name = _self;
+            obj.worker = worker;
+            obj.work_begining_time = TIMESTAMP_NOW;
+            obj.worker_payments_count = 0;
             obj.created = TIMESTAMP_NOW;
             obj.modified = TIMESTAMP_UNDEFINED;
 
@@ -691,6 +688,7 @@ public:
         _proposal_tspecs.emplace(author, [&](tspec_app_t &spec) {
             spec.id = tspec_app_id;
             spec.author = author;
+            spec.fund_name = _self;
             spec.data = tspec;
             spec.foreign_id = proposal_id;
             spec.created = TIMESTAMP_NOW;
@@ -787,6 +785,7 @@ public:
             });
             _proposal_tspecs.modify(tspec_app, author, [&](tspec_app_t& tspec) {
                 tspec.set_state(tspec_app_t::STATE_APPROVED);
+                deposit(tspec);
             });
         }
     }
@@ -826,13 +825,10 @@ public:
         auto proposal_ptr = get_proposal(tspec_app.foreign_id);
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
-        _proposals.modify(proposal_ptr, tspec_app.author, [&](proposal_t &proposal) {
-            proposal.worker = worker;
-            proposal.work_begining_time = TIMESTAMP_NOW;
-        });
-
         _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t& tspec) {
             tspec.set_state(tspec_app_t::STATE_WORK);
+            tspec.worker = worker;
+            tspec.work_begining_time = TIMESTAMP_NOW;
         });
     }
 
@@ -850,17 +846,17 @@ public:
         auto proposal_ptr = get_proposal(tspec_app.foreign_id);
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
-        if (initiator == proposal_ptr->worker)
+        if (initiator == tspec_app.worker)
         {
-            require_auth(proposal_ptr->worker);
+            require_auth(tspec_app.worker);
         }
         else
         {
             require_auth(tspec_app.author);
         }
 
-        _proposals.modify(proposal_ptr, initiator, [&](proposal_t &proposal) {
-            refund(proposal, initiator);
+        _proposal_tspecs.modify(tspec_app, initiator, [&](tspec_app_t& tspec) {
+            refund(tspec, initiator);
         });
 
         close_tspec(initiator, tspec_app, tspec_app_t::STATE_CLOSED, *proposal_ptr);
@@ -880,8 +876,8 @@ public:
         const auto& tspec_app = _proposal_tspecs.get(proposal_ptr->tspec_id);
         eosio_assert(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for poststatus");
         eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
-        require_auth(proposal_ptr->worker);
-        _proposal_status_comments.add(comment_id, proposal_ptr->id, proposal_ptr->worker, comment);
+        require_auth(tspec_app.worker);
+        _proposal_status_comments.add(comment_id, proposal_ptr->id, tspec_app.worker, comment);
     }
 
     /**
@@ -913,7 +909,7 @@ public:
    * @brief reviewwork posts delegate's review
    * @param tspec_app_id techspec application
    * @param reviewer delegate's account name
-   * @param status 0 - reject, 1 - approve. Look at the proposal_t::review_status_t
+   * @param status 0 - reject, 1 - approve. Look at the tspec_app_t::review_status_t
    * @param comment_id comemnt id
    * @param comment comment data, live empty if it isn't required
    */
@@ -923,17 +919,18 @@ public:
         require_app_delegate(reviewer);
 
         const auto& tspec = _proposal_tspecs.get(tspec_app_id);
-        const auto& proposal = _proposals.get(tspec.foreign_id);
 
         vote_t vote {
             .voter = reviewer,
-            .positive = status == proposal_t::STATUS_ACCEPT,
+            .positive = status == tspec_app_t::STATUS_ACCEPT,
             .foreign_id = tspec_app_id
         };
 
         _tspec_review_votes.vote(vote);
 
-        if (static_cast<proposal_t::review_status_t>(status) == proposal_t::STATUS_REJECT) {
+        const auto& proposal = _proposals.get(tspec.foreign_id);
+
+        if (static_cast<tspec_app_t::review_status_t>(status) == tspec_app_t::STATUS_REJECT) {
             eosio_assert(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW ||
                          tspec.state == tspec_app_t::STATE_WORK,
                          "invalid state for negative review");
@@ -943,13 +940,9 @@ public:
             {
                 //TODO: check that all voters are delegates in this moment
                 LOG("work has been rejected by the delegates voting, got % negative votes", negative_votes_count);
-                _proposals.modify(proposal, reviewer, [&](proposal_t& proposal) {
-                    refund(proposal, reviewer);
-                });
-
                 close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED, proposal);
             }
-        } else {
+        } else if (static_cast<tspec_app_t::review_status_t>(status) == tspec_app_t::STATUS_ACCEPT) {
             eosio_assert(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW, "invalid state for positive review");
 
             size_t positive_votes_count = _tspec_review_votes.count_positive(tspec_app_id);
@@ -958,19 +951,18 @@ public:
                 //TODO: check that all voters are delegates in this moment
                 LOG("work has been accepted by the delegates voting, got % positive votes", positive_votes_count);
 
-                _proposals.modify(proposal, reviewer, [&](proposal_t& proposal) {
-                    if (proposal.deposit.amount == 0 && proposal.type == proposal_t::TYPE_2) {
-                        deposit(proposal);
+                _proposal_tspecs.modify(tspec, reviewer, [&](tspec_app_t& tspec) {
+                    if (tspec.deposit.amount == 0 && proposal.type == proposal_t::TYPE_2) {
+                        deposit(tspec);
                     }
 
-                    pay_tspec_author(proposal);
-                    proposal.payment_begining_time = TIMESTAMP_NOW;
-                });
-
-                _proposal_tspecs.modify(tspec, reviewer, [&](tspec_app_t& tspec) {
                     tspec.set_state(tspec_app_t::STATE_PAYMENT);
+                    pay_tspec_author(tspec);
+                    tspec.payment_begining_time = TIMESTAMP_NOW;
                 });
             }
+        } else {
+            eosio_assert(false, "wrong status");
         }
     }
 
@@ -986,15 +978,13 @@ public:
         const auto& tspec = tspec_app.data;
         eosio_assert(tspec_app.state == tspec_app_t::STATE_PAYMENT, "invalid state for withdraw");
 
-        auto proposal_ptr = get_proposal(tspec_app.foreign_id);
+        require_auth(tspec_app.worker);
 
-        require_auth(proposal_ptr->worker);
-
-        LOG("proposal.worker: %, payments_count: %, payments_interval: %", proposal_ptr->worker,
+        LOG("tspec_app.worker: %, payments_count: %, payments_interval: %", tspec_app.worker,
             static_cast<int>(tspec.payments_count),
             static_cast<int>(tspec.payments_interval));
 
-        require_auth(proposal_ptr->worker);
+        require_auth(tspec_app.worker);
 
         asset quantity;
 
@@ -1004,35 +994,36 @@ public:
         }
         else
         {
-            const uint32_t payment_epoch = (now() - proposal_ptr->payment_begining_time.to_time_point().sec_since_epoch())
+            const uint32_t payment_epoch = (now() - tspec_app.payment_begining_time.to_time_point().sec_since_epoch())
                 / tspec.payments_interval;
 
             LOG("payment epoch: %, interval: %s, worker payments: %",
                 payment_epoch, tspec.payments_interval,
-                int(proposal_ptr->worker_payments_count));
+                int(tspec_app.worker_payments_count));
 
-            eosio_assert(payment_epoch > proposal_ptr->worker_payments_count, "can't withdraw right now");
+            eosio_assert(payment_epoch > tspec_app.worker_payments_count, "can't withdraw right now");
 
             quantity = tspec.development_cost / tspec.payments_count;
 
-            if (proposal_ptr->worker_payments_count + 1 == tspec.payments_count)
+            if (tspec_app.worker_payments_count + 1 == tspec.payments_count)
             {
                 quantity += asset(tspec.development_cost.amount % tspec.payments_count, quantity.symbol);
             }
         }
 
-        if (proposal_ptr->worker_payments_count+1 == tspec.payments_count) {
-            close_tspec(proposal_ptr->worker, tspec_app, tspec_app_t::STATE_PAYMENT_COMPLETE, *proposal_ptr);
+        if (tspec_app.worker_payments_count+1 == tspec.payments_count) {
+            auto proposal_ptr = get_proposal(tspec_app.foreign_id);
+            close_tspec(tspec_app.worker, tspec_app, tspec_app_t::STATE_PAYMENT_COMPLETE, *proposal_ptr);
         }
 
-        _proposals.modify(proposal_ptr, proposal_ptr->worker, [&](proposal_t &proposal) {
-            proposal.deposit -= quantity;
-            proposal.worker_payments_count += 1;
+        _proposal_tspecs.modify(tspec_app, tspec_app.worker, [&](tspec_app_t& t) {
+            t.deposit -= quantity;
+            t.worker_payments_count += 1;
         });
 
         action(permission_level{_self, "active"_n},
                TOKEN_ACCOUNT, "transfer"_n,
-               std::make_tuple(_self, proposal_ptr->worker,
+               std::make_tuple(_self, tspec_app.worker,
                                quantity, std::string("worker reward")))
                 .send();
     }

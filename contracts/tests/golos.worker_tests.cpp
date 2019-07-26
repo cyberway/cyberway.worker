@@ -24,7 +24,7 @@ const name token_code_account = name("eosio.token");
 const asset app_token_supply = asset::from_string("1000000.000 APP");
 const asset app_fund_supply = asset::from_string("100.000 APP");
 const asset initial_user_supply = asset::from_string("10.000 APP");
-const asset proposal_deposit = asset::from_string("10.000 APP");
+const asset tspec_deposit = asset::from_string("10.000 APP");
 
 constexpr const char *long_text = "Lorem ipsum dolor sit amet, amet sint accusam sit te, te perfecto sadipscing vix, eam labore volumus dissentias ne. Est nonumy numquam fierent te. Te pri saperet disputando delicatissimi, pri semper ornatus ad. Paulo convenire argumentum cum te, te vix meis idque, odio tempor nostrum ius ad. Cu doctus mediocrem petentium his, eum sale errem timeam ne. Ludus debitis id qui, vix mucius antiopam ad. Facer signiferumque vis no, sale eruditi expetenda id ius.";
 constexpr size_t delegates_count = 21;
@@ -330,8 +330,8 @@ class golos_worker_tester : public tester
         }
 
         BOOST_REQUIRE_EQUAL(worker->get_proposal_state(proposal_id), STATE_TSPEC_CREATE);
-        // if technical specification application was upvoted, `proposal_deposit` should be deposited from the application fund
-        BOOST_REQUIRE_EQUAL(worker->get_proposal(proposal_id)["deposit"], proposal_deposit.to_string());
+        // if technical specification application was upvoted, `tspec_deposit` should be deposited from the application fund
+        BOOST_REQUIRE_EQUAL(worker->get_tspec(tspec_app_id)["deposit"], tspec_deposit.to_string());
         BOOST_REQUIRE_EQUAL(worker->get_tspec_state(tspec_app_id), STATE_APPROVED);
 
         /* ok,technical specification application has been choosen,
@@ -866,7 +866,7 @@ try
     add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
     // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CREATE`, `STATE_WORK`
-    BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - proposal_deposit).to_string());
+    BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - tspec_deposit).to_string());
 
     ASSERT_SUCCESS(worker->push_action(worker_account, N(cancelwork), mvo()
         ("tspec_app_id", tspec_id)
@@ -903,7 +903,7 @@ try
     add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
     // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CREATE`, `STATE_WORK`
-    BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - proposal_deposit).to_string());
+    BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - tspec_deposit).to_string());
 
     ASSERT_SUCCESS(worker->push_action(tspec_author, N(cancelwork), mvo()
         ("tspec_app_id", tspec_id)
@@ -941,7 +941,7 @@ try
     add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
     // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CREATE`, `STATE_WORK`
-    BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - proposal_deposit).to_string());
+    BOOST_REQUIRE_EQUAL(worker->get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - tspec_deposit).to_string());
 
     for (size_t i = 0; i < delegates.size() * 3 / 4 + 1; i++) {
         const name &delegate = delegates[i];
