@@ -4,7 +4,7 @@
 namespace eosio { namespace testing {
 
 #define GOLOS_CONTRACTS "${CMAKE_BINARY_DIR}/../"
-#define CYBERWAY_CONTRACTS "${CMAKE_BINARY_DIR}/../../../cyberway.contracts/build/"
+#define CYBERWAY_CONTRACTS "${CMAKE_BINARY_DIR}/../../cyberway.contracts/build/"
 
 const std::string golos_contracts = getenv("GOLOS_CONTRACTS") ?: GOLOS_CONTRACTS;
 const std::string cyberway_contracts = getenv("CYBERWAY_CONTRACTS") ?: CYBERWAY_CONTRACTS;

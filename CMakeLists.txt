@@ -55,7 +55,7 @@ endif(NOT DEFINED TOKEN_NAME)
 # configure_file(${CMAKE_CURRENT_SOURCE_DIR}/common/config.hpp.in ${CMAKE_CURRENT_SOURCE_DIR}/common/config.hpp)
 
 # include_directories(AFTER ${BOOST_ROOT}/include)
-add_subdirectory(contracts/golos.worker)
+add_subdirectory(golos.worker)
 
 if (APPLE)
    set(OPENSSL_ROOT "/usr/local/opt/openssl")
