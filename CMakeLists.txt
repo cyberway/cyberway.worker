@@ -55,6 +55,14 @@ endif(NOT DEFINED TOKEN_NAME)
 # configure_file(${CMAKE_CURRENT_SOURCE_DIR}/common/config.hpp.in ${CMAKE_CURRENT_SOURCE_DIR}/common/config.hpp)
 
 # include_directories(AFTER ${BOOST_ROOT}/include)
+
+macro(add_contract_with_abi TARGET ABIFILE)
+   add_executable( ${TARGET}.wasm ${ARGN} )
+   configure_file(${ABIFILE} ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.abi COPYONLY)
+   install (TARGETS ${TARGET}.wasm DESTINATION ${CMAKE_INSTALL_PREFIX}/${TARGET}/)
+   install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.abi DESTINATION ${CMAKE_INSTALL_PREFIX}/${TARGET}/)
+endmacro()
+
 add_subdirectory(golos.worker)
 
 if (APPLE)
