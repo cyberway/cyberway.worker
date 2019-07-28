@@ -78,7 +78,7 @@
             ]
         },
         {
-            "name": "addpropos2",
+            "name": "addproposdn",
             "base": "",
             "fields": [
                 {
@@ -598,8 +598,8 @@
             "type": "addpropos"
         },
         {
-            "name": "addpropos2",
-            "type": "addpropos2"
+            "name": "addproposdn",
+            "type": "addproposdn"
         },
         {
             "name": "addtspec",
