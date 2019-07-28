@@ -12,18 +12,18 @@
 #include <string>
 #include <vector>
 
+#include <cyberway.contracts/cyber.token/include/cyber.token/cyber.token.hpp>
+#include <cyberway.contracts/common/dispatchers.hpp>
 #include "external.hpp"
 
+namespace cfg = cyber::config;
 using namespace eosio;
 using namespace std;
 
-#define TOKEN_ACCOUNT "eosio.token"_n
 #define ZERO_ASSET eosio::asset(0, get_state().token_symbol)
 #define TIMESTAMP_UNDEFINED 0
 #define TIMESTAMP_NOW eosio::current_time_point().sec_since_epoch()
 
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
 #define ACCOUNT_NAME_CSTR(account_name) eosio::name(account_name).to_string().c_str()
 #define LOG(format, ...) print_f("%(%): " format "\n", __FUNCTION__, ACCOUNT_NAME_CSTR(_self), ##__VA_ARGS__);
 
@@ -376,7 +376,7 @@ protected:
         proposal.deposit -= tspec.specification_cost;
 
         action(permission_level{_self, "active"_n},
-               TOKEN_ACCOUNT,
+               cfg::token_name,
                "transfer"_n,
                std::make_tuple(_self, tspec_app.author,
                                tspec.specification_cost,
@@ -415,7 +415,7 @@ protected:
         _proposal_tspecs.erase(tspec_app);
     }
 public:
-    worker(eosio::name receiver, eosio::name code, eosio::datastream<const char *>& ds) : contract(receiver, code, ds),
+    worker(eosio::name receiver, eosio::name code, eosio::datastream<const char *> ds) : contract(receiver, code, ds),
         _state(_self, _self.value),
         _proposals(_self, _self.value),
         _funds(_self, _self.value),
@@ -1010,56 +1010,49 @@ public:
         });
 
         action(permission_level{_self, "active"_n},
-               TOKEN_ACCOUNT, "transfer"_n,
+               cfg::token_name, "transfer"_n,
                std::make_tuple(_self, proposal_ptr->worker,
                                quantity, std::string("worker reward")))
                 .send();
     }
 
-    // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
-    void transfer(const transfer_args& t)
-    {
-        LOG("transfer % from \"%\" to \"%\"\n", t.quantity, ACCOUNT_NAME_CSTR(t.from), ACCOUNT_NAME_CSTR(t.to));
+    void on_transfer(name from, name to, eosio::asset quantity, std::string memo) {
+        if (to != _self) {
+            return;
+        }
+        // Can be filled by emission (memo == "emission") or someone's transfer
 
-        if (t.memo.size() > 13 || t.to != current_receiver()) {
+        if (memo.size() > 13) {
             LOG("skiping transfer\n");
             return;
         }
 
-        if (t.quantity.symbol != get_state().token_symbol) {
-            LOG("invalid symbol code: %, expected: %\n", t.quantity.symbol, get_state().token_symbol);
+        if (quantity.symbol != get_state().token_symbol) {
+            LOG("invalid symbol code: %, expected: %\n", quantity.symbol, get_state().token_symbol);
             return;
         }
 
-        if (t.to != _self || get_code() != TOKEN_ACCOUNT) {
-            LOG("invalid beneficiary or contract code\n");
-            return;
-        }
-
-        const eosio::name &ram_payer = t.to;
-        const name fund_name = name(t.memo);
+        const auto fund_name = name(memo);
 
         auto fund_ptr = _funds.find(fund_name.value);
         if (fund_ptr == _funds.end()) {
-            _funds.emplace(ram_payer, [&](auto &fund) {
+            _funds.emplace(_self, [&](auto &fund) {
                 fund.owner = fund_name;
-                fund.quantity = t.quantity;
+                fund.quantity = quantity;
             });
         } else {
-            _funds.modify(fund_ptr, ram_payer, [&](auto &fund) {
-                fund.quantity += t.quantity;
+            _funds.modify(fund_ptr, eosio::same_payer, [&](auto &fund) {
+                fund.quantity += quantity;
             });
         }
 
-        LOG("added % credits to % fund", t.quantity, t.memo.c_str());
+        LOG("added % credits to % fund", quantity, memo.c_str());
     }
 };
 } // namespace golos
 
-extern "C" {
-   void apply(uint64_t receiver, uint64_t code, uint64_t action) {
-         switch(action) {
-            EOSIO_DISPATCH_HELPER(golos::worker, (createpool)(addproposdn)(addpropos)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)(transfer))
-        }
-    }
-}
+DISPATCH_WITH_TRANSFER(golos::worker, cfg::token_name, on_transfer, (createpool)
+    (addproposdn)(addpropos)(editpropos)(delpropos)(votepropos)
+    (addcomment)(editcomment)(delcomment)
+    (addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)
+)

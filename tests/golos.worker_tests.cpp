@@ -1,5 +1,6 @@
 #include "golos_tester.hpp"
 #include "golos.worker_test_api.hpp"
+#include "cyber.token_test_api.hpp"
 #include <boost/test/unit_test.hpp>
 #include <boost/format.hpp>
 #include <eosio/testing/tester.hpp>
@@ -9,7 +10,9 @@
 #include <iostream>
 #include <fc/variant_object.hpp>
 #include "contracts.hpp"
+#include <cyberway.contracts/common/config.hpp>
 
+namespace cfg = cyber::config;
 using namespace eosio;
 using namespace eosio::chain;
 using namespace eosio::testing;
@@ -22,11 +25,10 @@ using mvo = fc::mutable_variant_object;
 #define ASSERT_SUCCESS(action) BOOST_REQUIRE_EQUAL((action), success())
 
 const name worker_code_account = name("golos.worker");
-const name token_code_account = name("eosio.token");
 const asset app_token_supply = asset::from_string("1000000.000 APP");
 const asset app_fund_supply = asset::from_string("100.000 APP");
 const asset initial_user_supply = asset::from_string("10.000 APP");
-const asset proposal_deposit = asset::from_string("10.000 APP");
+const asset tspec_deposit = asset::from_string("10.000 APP");
 
 constexpr const char *long_text = "Lorem ipsum dolor sit amet, amet sint accusam sit te, te perfecto sadipscing vix, eam labore volumus dissentias ne. Est nonumy numquam fierent te. Te pri saperet disputando delicatissimi, pri semper ornatus ad. Paulo convenire argumentum cum te, te vix meis idque, odio tempor nostrum ius ad. Cu doctus mediocrem petentium his, eum sale errem timeam ne. Ludus debitis id qui, vix mucius antiopam ad. Facer signiferumque vis no, sale eruditi expetenda id ius.";
 constexpr size_t delegates_count = 21;
@@ -49,15 +51,19 @@ enum tspec_state_t {
 
 class golos_worker_tester : public golos_tester {
 protected:
+    symbol _sym;
     golos_worker_api worker;
+    cyber_token_api token;
     vector<name> delegates;
     vector<name> members;
 public:
     golos_worker_tester() 
         : golos_tester(worker_code_account, false),
-        worker(this, worker_code_account)
+        _sym(3, "APP"),
+        worker(this, worker_code_account),
+        token({this, cfg::token_name, _sym})
     {
-        create_account(_code);
+        create_accounts({cfg::token_name, _code});
         for (int i = 0; i < delegates_count; i++)
         {
             name delegate_name = string("delegate") + static_cast<char>('a' + i);
@@ -69,22 +75,30 @@ public:
         create_accounts(members);
         produce_block();
 
+        install_contract(cfg::token_name, contracts::token_wasm(), contracts::token_abi());
         install_contract(_code, contracts::worker_wasm(), contracts::worker_abi()); 
 
         init();
     }
 
     void init() {
-        ASSERT_SUCCESS(worker.push_action(_code, N(createpool), mvo()("token_symbol", app_token_supply.get_symbol())));
-        produce_blocks();
-        // TODO: recover funds tests in another issue
-        // add some funds to golos.worker contract
-        //ASSERT_SUCCESS(token->issue(token_code_account, worker_code_account, app_fund_supply, worker_code_account.to_string()));
-        //ASSERT_SUCCESS(token->open(worker_code_account, app_fund_supply.get_symbol().to_string(), worker_code_account));
-        //produce_blocks();
+        ASSERT_SUCCESS(token.create(cfg::token_name, app_token_supply));
 
-        //auto fund = worker.get_fund(_code, _code);
-        //BOOST_REQUIRE(!fund.is_null());
+        for (auto& account : members) {
+            ASSERT_SUCCESS(token.issue(cfg::token_name, account, initial_user_supply, "initial issue"));
+            ASSERT_SUCCESS(token.open(account, initial_user_supply.get_symbol(), account));
+            produce_blocks();
+        }
+
+        ASSERT_SUCCESS(worker.push_action(_code, N(createpool), mvo()("token_symbol", app_token_supply.get_symbol())));
+            produce_blocks();
+        // add some funds to golos.worker contract
+        ASSERT_SUCCESS(token.issue(cfg::token_name, _code, app_fund_supply, _code.to_string()));
+        ASSERT_SUCCESS(token.open(_code, app_fund_supply.get_symbol(), _code));
+        produce_blocks();
+
+        auto fund = worker.get_fund(_code, _code);
+        BOOST_REQUIRE(!fund.is_null());
     }
 
     void add_proposal(uint64_t proposal_id, const name& proposal_author, uint64_t tspec_app_id, const name& tspec_author, const name& worker_account) {
@@ -145,8 +159,8 @@ public:
         }
 
         BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
-        // if technical specification application was upvoted, `proposal_deposit` should be deposited from the application fund
-        BOOST_REQUIRE_EQUAL(worker.get_proposal(proposal_id)["deposit"], proposal_deposit.to_string());
+        // if technical specification application was upvoted, `tspec_deposit` should be deposited from the application fund
+        BOOST_REQUIRE_EQUAL(worker.get_proposal(proposal_id)["deposit"].as<asset>(), tspec_deposit);
         BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_app_id), STATE_APPROVED);
 
         /* ok,technical specification application has been choosen,
@@ -603,12 +617,8 @@ try
         BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT_COMPLETE);
         BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
 
-        // TODO: recover funds tests in another issue
-        //auto worker_balance = token->get_account(worker_account, "3,APP");
-        //REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
-
-        //auto author_balance = token->get_account(tspec_author, "3,APP");
-        //REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "15.000 APP"));
+        BOOST_REQUIRE_EQUAL(token.get_account(worker_account)["balance"], "15.000 APP");
+        BOOST_REQUIRE_EQUAL(token.get_account(tspec_author)["balance"], "15.000 APP");
     }
 }
 FC_LOG_AND_RETHROW()
@@ -666,12 +676,8 @@ try
     BOOST_REQUIRE_EQUAL(worker.get_tspec_state(0), STATE_PAYMENT_COMPLETE); // addproposdn uses available_primary_key
     BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
 
-   // TODO: recover funds tests in another issue
-   //auto worker_balance = token->get_account(worker_account, "3,APP");
-   //REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", "15.000 APP"));
-
-   //auto author_balance = token->get_account(author_account, "3,APP");
-   //REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", "15.000 APP"));
+    BOOST_REQUIRE_EQUAL(token.get_account(worker_account)["balance"], "15.000 APP");
+    BOOST_REQUIRE_EQUAL(token.get_account(author_account)["balance"], "15.000 APP");
 }
 FC_LOG_AND_RETHROW()
 
@@ -688,8 +694,8 @@ try
 
     add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
-    // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CHOSE`, `STATE_WORK`
-    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - proposal_deposit).to_string());
+    // the application fund quantity should be `tspec_deposit` less if tspec is approved
+    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply - tspec_deposit);
 
     ASSERT_SUCCESS(worker.push_action(worker_account, N(cancelwork), mvo()
         ("tspec_app_id", tspec_id)
@@ -701,15 +707,11 @@ try
     BOOST_REQUIRE_EQUAL(worker.push_action(worker_account, N(withdraw), mvo()
         ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
 
-    // if proposal is closed deposit should be refunded to the application fund
-    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"], app_fund_supply.to_string());
+    // if tspec is closed deposit should be refunded to the application fund
+    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply);
 
-    // TODO: recover funds tests in another issue
-    //auto worker_balance = token->get_account(worker_account, initial_user_supply.get_symbol().to_string());
-    //REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", initial_user_supply));
-
-    //auto author_balance = token->get_account(tspec_author, initial_user_supply.get_symbol().to_string());
-    //REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", initial_user_supply));
+    BOOST_REQUIRE_EQUAL(token.get_account(worker_account)["balance"], initial_user_supply.to_string());
+    BOOST_REQUIRE_EQUAL(token.get_account(tspec_author)["balance"], initial_user_supply.to_string());
 }
 FC_LOG_AND_RETHROW()
 
@@ -726,8 +728,8 @@ try
 
     add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
-    // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CHOSE`, `STATE_WORK`
-    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - proposal_deposit).to_string());
+    // the application fund quantity should be `tspec_deposit` less if tspec is approved
+    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply - tspec_deposit);
 
     ASSERT_SUCCESS(worker.push_action(tspec_author, N(cancelwork), mvo()
         ("tspec_app_id", tspec_id)
@@ -739,15 +741,11 @@ try
     BOOST_REQUIRE_EQUAL(worker.push_action(worker_account, N(withdraw), mvo()
         ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
 
-    // if proposal is closed deposit should be refunded to the application fund
-    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"], app_fund_supply.to_string());
+    // if tspec is closed deposit should be refunded to the application fund
+    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply);
 
-    // TODO: recover funds tests in another issue
-    //auto worker_balance = token->get_account(worker_account, initial_user_supply.get_symbol().to_string());
-    //REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", initial_user_supply));
-
-    //auto author_balance = token->get_account(tspec_author, initial_user_supply.get_symbol().to_string());
-    //REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", initial_user_supply));
+    BOOST_REQUIRE_EQUAL(token.get_account(worker_account)["balance"], initial_user_supply.to_string());
+    BOOST_REQUIRE_EQUAL(token.get_account(tspec_author)["balance"], initial_user_supply.to_string());
 }
 FC_LOG_AND_RETHROW()
 
@@ -765,8 +763,8 @@ try
 
     add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
-    // the application fund quantity should be `propsal_deposit` less if proposal is in `STATE_TSPEC_CHOSE`, `STATE_WORK`
-    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"], (app_fund_supply - proposal_deposit).to_string());
+    // the application fund quantity should be `tspec_deposit` less if tspec is approved
+    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply - tspec_deposit);
 
     for (size_t i = 0; i < delegates.size() * 3 / 4 + 1; i++) {
         const name &delegate = delegates[i];
@@ -784,15 +782,11 @@ try
     BOOST_REQUIRE_EQUAL(worker.push_action(worker_account, N(withdraw), mvo()
         ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
 
-    // if proposal is closed deposit should be refunded to the application fund
-    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"], app_fund_supply.to_string());
+    // if tspec is closed deposit should be refunded to the application fund
+    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply);
 
-    // TODO: recover funds tests in another issue
-    //auto worker_balance = token->get_account(worker_account, initial_user_supply.get_symbol().to_string());
-    //REQUIRE_MATCHING_OBJECT(worker_balance, mvo()("balance", initial_user_supply));
-
-    //auto author_balance = token->get_account(tspec_author, initial_user_supply.get_symbol().to_string());
-    //REQUIRE_MATCHING_OBJECT(author_balance, mvo()("balance", initial_user_supply));
+    BOOST_REQUIRE_EQUAL(token.get_account(worker_account)["balance"], initial_user_supply.to_string());
+    BOOST_REQUIRE_EQUAL(token.get_account(tspec_author)["balance"], initial_user_supply.to_string());
 }
 FC_LOG_AND_RETHROW()
 
