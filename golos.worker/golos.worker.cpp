@@ -24,8 +24,7 @@ using namespace std;
 #define TIMESTAMP_UNDEFINED 0
 #define TIMESTAMP_NOW eosio::current_time_point().sec_since_epoch()
 
-#define ACCOUNT_NAME_CSTR(account_name) eosio::name(account_name).to_string().c_str()
-#define LOG(format, ...) print_f("%(%): " format "\n", __FUNCTION__, ACCOUNT_NAME_CSTR(_self), ##__VA_ARGS__);
+#define LOG(format, ...) print_f("%::%: " format "\n", _self.to_string().c_str(), __FUNCTION__, ##__VA_ARGS__);
 
 namespace golos
 {
@@ -350,7 +349,6 @@ protected:
         const tspec_data_t &tspec = _proposal_tspecs.get(proposal.tspec_id).data;
         const asset budget = tspec.development_cost + tspec.specification_cost;
         const auto &fund = _funds.get(proposal.fund_name.value);
-        LOG("proposal.id: %, budget: %, fund: %", proposal.id, budget, proposal.fund_name);
         eosio::check(budget <= fund.quantity, "insufficient funds");
 
         proposal.deposit = budget;
@@ -372,7 +370,6 @@ protected:
         const tspec_app_t& tspec_app = _proposal_tspecs.get(proposal.tspec_id);
         const tspec_data_t& tspec = tspec_app.data;
 
-        LOG("paying % to %", tspec.specification_cost, ACCOUNT_NAME_CSTR(tspec_app.author));
         proposal.deposit -= tspec.specification_cost;
 
         action(permission_level{_self, "active"_n},
@@ -389,7 +386,6 @@ protected:
         eosio::check(proposal.deposit.amount > 0, "no funds were deposited");
 
         const auto &fund = _funds.get(proposal.fund_name.value);
-        LOG("% to % fund", proposal.deposit, ACCOUNT_NAME_CSTR(fund.owner));
         _funds.modify(fund, modifier, [&](auto &obj) {
             obj.quantity += proposal.deposit;
         });
@@ -435,13 +431,11 @@ public:
     [[eosio::action]]
     void createpool(eosio::symbol token_symbol)
     {
-        LOG("creating worker's pool: token_symbol=\"%\"", token_symbol);
         eosio::check(!_state.exists(), "workers pool is already initialized for the specified app domain");
         require_auth(_self);
 
         state_t state{.token_symbol = token_symbol};
         _state.set(state, _self);
-        LOG("created");
     }
 
     /**
@@ -455,8 +449,6 @@ public:
     void addpropos(proposal_id_t proposal_id, const eosio::name& author, const string& title, const string& description) {
         require_app_member(author);
 
-        LOG("adding propos % \"%\" by %", proposal_id, title.c_str(), ACCOUNT_NAME_CSTR(author));
-
         _proposals.emplace(author, [&](auto &o) {
             o.id = proposal_id;
             o.type = proposal_t::TYPE_TASK;
@@ -467,7 +459,6 @@ public:
             o.created = TIMESTAMP_NOW;
             o.modified = TIMESTAMP_UNDEFINED;
         });
-        LOG("added % % %", ACCOUNT_NAME_CSTR(_self), _proposals.get(proposal_id).id);
     }
 
     /**
@@ -492,8 +483,6 @@ public:
                const comment_data_t &comment)
     {
         require_app_member(author);
-
-        LOG("adding propos % \"%\" by %, worker: %", proposal_id, title.c_str(), ACCOUNT_NAME_CSTR(author), ACCOUNT_NAME_CSTR(worker));
 
         tspec_id_t tspec_id = _proposal_tspecs.available_primary_key();
 
@@ -610,7 +599,6 @@ public:
     void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, eosio::name author, const comment_data_t &data) {
         const proposal_t &proposal = _proposals.get(proposal_id);
 
-        LOG("proposal_id: %, comment_id: %, author: %", proposal_id, comment_id, ACCOUNT_NAME_CSTR(author));
         _proposal_comments.add(comment_id, proposal_id, author, data);
     }
 
@@ -624,8 +612,6 @@ public:
     [[eosio::action]]
     void editcomment(comment_id_t comment_id, const comment_data_t &data)
     {
-        LOG("comment_id: %", comment_id);
-
         const proposal_id_t proposal_id = _proposal_comments.comments.get(comment_id).foreign_id;
         const proposal_t& proposal = _proposals.get(proposal_id);
 
@@ -640,8 +626,6 @@ public:
    */
     [[eosio::action]]
     void delcomment(comment_id_t comment_id) {
-        LOG("comment_id: %", comment_id);
-
         const proposal_id_t proposal_id = _proposal_comments.comments.get(comment_id).foreign_id;
         const proposal_t &proposal = _proposals.get(proposal_id);
 
@@ -659,7 +643,6 @@ public:
     [[eosio::action]]
     void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, eosio::name author, const tspec_data_t &tspec, const string& tspec_text)
     {
-        LOG("proposal_id: %, tspec_id: %, author: %", proposal_id, tspec_app_id, ACCOUNT_NAME_CSTR(author));
         auto proposal_ptr = get_proposal(proposal_id);
         eosio::check(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
         eosio::check(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for addtspec");
@@ -687,9 +670,8 @@ public:
    */
     [[eosio::action]]
     void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec, const string& tspec_text) {
-        const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
-        const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
-        LOG("proposal_id: %, tspec_id: %", proposal.id, tspec_app.id);
+        const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
+        const auto& proposal = _proposals.get(tspec_app.foreign_id);
 
         eosio::check(proposal.state == proposal_t::STATE_TSPEC_APP || 
                      proposal.state == proposal_t::STATE_TSPEC_CHOSE, "invalid state for edittspec");
@@ -737,11 +719,9 @@ public:
    */
     [[eosio::action]]
     void approvetspec(tspec_id_t tspec_app_id, eosio::name author, comment_id_t comment_id, const comment_data_t &comment) {
-        LOG("tpsec.id: %, author: %, comment.id: % comment.text: %", tspec_app_id, ACCOUNT_NAME_CSTR(author), comment_id, comment.text.c_str());
-
-        const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
-        proposal_id_t proposal_id = tspec_app.foreign_id;
-        const proposal_t &proposal = _proposals.get(proposal_id);
+        const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
+        auto proposal_id = tspec_app.foreign_id;
+        const auto& proposal = _proposals.get(proposal_id);
 
         eosio::check(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for approvetspec");
         eosio::check(proposal.type == proposal_t::TYPE_TASK, "unsupported action");
@@ -775,8 +755,6 @@ public:
      **/
     [[eosio::action]]
     void dapprovetspec(tspec_id_t tspec_app_id, eosio::name author) {
-        LOG("tpsec.id: %, author: %", tspec_app_id, ACCOUNT_NAME_CSTR(author));
-
         const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
         proposal_id_t proposal_id = tspec_app.foreign_id;
         const proposal_t &proposal = _proposals.get(proposal_id);
@@ -797,7 +775,6 @@ public:
    */
     [[eosio::action]]
     void startwork(tspec_id_t tspec_app_id, eosio::name worker) {
-        LOG("tspec_app_id: %, worker: %", tspec_app_id, ACCOUNT_NAME_CSTR(worker));
         const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
         require_auth(tspec_app.author);
         eosio::check(tspec_app.state == tspec_app_t::STATE_APPROVED, "invalid state for startwork");
@@ -821,9 +798,7 @@ public:
    * @param initiator a cancel initiator's account name
    */
     [[eosio::action]]
-    void cancelwork(tspec_id_t tspec_app_id, eosio::name initiator)
-    {
-        LOG("tspec_app_id: %, initiator: %", tspec_app_id, ACCOUNT_NAME_CSTR(initiator));
+    void cancelwork(tspec_id_t tspec_app_id, eosio::name initiator) {
         const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
         eosio::check(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for cancelwork");
         auto proposal_ptr = get_proposal(tspec_app.foreign_id);
@@ -854,7 +829,6 @@ public:
    */
     [[eosio::action]]
     void poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment) {
-        LOG("proposal_id: %, comment: %", proposal_id, comment.text.c_str());
         auto proposal_ptr = get_proposal(proposal_id);
         const auto& tspec_app = _proposal_tspecs.get(proposal_ptr->tspec_id);
         eosio::check(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for poststatus");
@@ -872,8 +846,6 @@ public:
     [[eosio::action]]
     void acceptwork(tspec_id_t tspec_app_id, comment_id_t comment_id, const comment_data_t &comment)
     {
-        LOG("tspec_app_id: %, comment: %", tspec_app_id, comment.text.c_str());
-
         const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
         require_auth(tspec_app.author);
         eosio::check(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for acceptwork");
@@ -898,7 +870,6 @@ public:
    */
     [[eosio::action]]
     void reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t status, comment_id_t comment_id, const comment_data_t &comment) {
-        LOG("tspec_app_id: %, comment: %, status: %, reviewer: %", tspec_app_id, comment.text.c_str(), (int)status, ACCOUNT_NAME_CSTR(reviewer));
         require_app_delegate(reviewer);
 
         const auto& tspec = _proposal_tspecs.get(tspec_app_id);
@@ -960,7 +931,6 @@ public:
     [[eosio::action]]
     void withdraw(tspec_id_t tspec_app_id)
     {
-        LOG("tspec_app_id: %", tspec_app_id);
         const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
         const auto& tspec = tspec_app.data;
         eosio::check(tspec_app.state == tspec_app_t::STATE_PAYMENT, "invalid state for withdraw");
