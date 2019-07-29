@@ -1,0 +1,803 @@
+{
+    "version": "cyberway::abi/1.1",
+    "types": [
+        {
+            "new_type_name": "comment_id_t",
+            "type": "uint64"
+        },
+        {
+            "new_type_name": "proposal_id_t",
+            "type": "uint64"
+        },
+        {
+            "new_type_name": "tspec_id_t",
+            "type": "uint64"
+        }
+    ],
+    "structs": [
+        {
+            "name": "acceptwork",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "comment_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "comment",
+                    "type": "comment_data_t"
+                }
+            ]
+        },
+        {
+            "name": "addcomment",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "proposal_id_t"
+                },
+                {
+                    "name": "comment_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                },
+                {
+                    "name": "data",
+                    "type": "comment_data_t"
+                }
+            ]
+        },
+        {
+            "name": "addpropos",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "proposal_id_t"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                },
+                {
+                    "name": "title",
+                    "type": "string"
+                },
+                {
+                    "name": "description",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "addproposdn",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "proposal_id_t"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                },
+                {
+                    "name": "worker",
+                    "type": "name"
+                },
+                {
+                    "name": "title",
+                    "type": "string"
+                },
+                {
+                    "name": "description",
+                    "type": "string"
+                },
+                {
+                    "name": "tspec",
+                    "type": "tspec_data_t"
+                },
+                {
+                    "name": "tspec_text",
+                    "type": "string"
+                },
+                {
+                    "name": "comment_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "comment",
+                    "type": "comment_data_t"
+                }
+            ]
+        },
+        {
+            "name": "addtspec",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "proposal_id_t"
+                },
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                },
+                {
+                    "name": "tspec",
+                    "type": "tspec_data_t"
+                },
+                {
+                    "name": "tspec_text",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "approvetspec",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                },
+                {
+                    "name": "comment_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "comment",
+                    "type": "comment_data_t"
+                }
+            ]
+        },
+        {
+            "name": "cancelwork",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "initiator",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "comment_data_t",
+            "base": "",
+            "fields": [
+                {
+                    "name": "text",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "comment_t",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "foreign_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                },
+                {
+                    "name": "data",
+                    "type": "comment_data_t"
+                },
+                {
+                    "name": "created",
+                    "type": "uint64"
+                },
+                {
+                    "name": "modified",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "createpool",
+            "base": "",
+            "fields": [
+                {
+                    "name": "token_symbol",
+                    "type": "symbol"
+                }
+            ]
+        },
+        {
+            "name": "dapprovetspec",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "delcomment",
+            "base": "",
+            "fields": [
+                {
+                    "name": "comment_id",
+                    "type": "comment_id_t"
+                }
+            ]
+        },
+        {
+            "name": "delpropos",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "proposal_id_t"
+                }
+            ]
+        },
+        {
+            "name": "deltspec",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                }
+            ]
+        },
+        {
+            "name": "editcomment",
+            "base": "",
+            "fields": [
+                {
+                    "name": "comment_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "data",
+                    "type": "comment_data_t"
+                }
+            ]
+        },
+        {
+            "name": "editpropos",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "proposal_id_t"
+                },
+                {
+                    "name": "title",
+                    "type": "string"
+                },
+                {
+                    "name": "description",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "edittspec",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "tspec",
+                    "type": "tspec_data_t"
+                },
+                {
+                    "name": "tspec_text",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "fund_t",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                }
+            ]
+        },
+        {
+            "name": "poststatus",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "proposal_id_t"
+                },
+                {
+                    "name": "comment_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "comment",
+                    "type": "comment_data_t"
+                }
+            ]
+        },
+        {
+            "name": "proposal_t",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "proposal_id_t"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                },
+                {
+                    "name": "type",
+                    "type": "uint8"
+                },
+                {
+                    "name": "state",
+                    "type": "uint8"
+                },
+                {
+                    "name": "fund_name",
+                    "type": "name"
+                },
+                {
+                    "name": "deposit",
+                    "type": "asset"
+                },
+                {
+                    "name": "tspec_id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "worker",
+                    "type": "name"
+                },
+                {
+                    "name": "work_begining_time",
+                    "type": "uint64"
+                },
+                {
+                    "name": "worker_payments_count",
+                    "type": "uint8"
+                },
+                {
+                    "name": "payment_begining_time",
+                    "type": "uint64"
+                },
+                {
+                    "name": "created",
+                    "type": "uint64"
+                },
+                {
+                    "name": "modified",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "reviewwork",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "reviewer",
+                    "type": "name"
+                },
+                {
+                    "name": "status",
+                    "type": "uint8"
+                },
+                {
+                    "name": "comment_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "comment",
+                    "type": "comment_data_t"
+                }
+            ]
+        },
+        {
+            "name": "startwork",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "worker",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "state_t",
+            "base": "",
+            "fields": [
+                {
+                    "name":"id",
+                    "type":"uint64"
+                },
+                {
+                    "name": "token_symbol",
+                    "type": "symbol"
+                }
+            ]
+        },
+        {
+            "name": "tspec_app_t",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "foreign_id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                },
+                {
+                    "name": "state",
+                    "type": "uint8"
+                },
+                {
+                    "name": "data",
+                    "type": "tspec_data_t"
+                },
+                {
+                    "name": "created",
+                    "type": "uint64"
+                },
+                {
+                    "name": "modified",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "tspec_data_t",
+            "base": "",
+            "fields": [
+                {
+                    "name": "specification_cost",
+                    "type": "asset"
+                },
+                {
+                    "name": "specification_eta",
+                    "type": "uint32"
+                },
+                {
+                    "name": "development_cost",
+                    "type": "asset"
+                },
+                {
+                    "name": "development_eta",
+                    "type": "uint32"
+                },
+                {
+                    "name": "payments_count",
+                    "type": "uint16"
+                },
+                {
+                    "name": "payments_interval",
+                    "type": "uint32"
+                }
+            ]
+        },
+        {
+            "name": "vote_t",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "voter",
+                    "type": "name"
+                },
+                {
+                    "name": "foreign_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "positive",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "votepropos",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "proposal_id_t"
+                },
+                {
+                    "name": "voter",
+                    "type": "name"
+                },
+                {
+                    "name": "positive",
+                    "type": "uint8"
+                }
+            ]
+        },
+        {
+            "name": "withdraw",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                }
+            ]
+        }
+    ],
+    "actions": [
+        {
+            "name": "acceptwork",
+            "type": "acceptwork"
+        },
+        {
+            "name": "addcomment",
+            "type": "addcomment"
+        },
+        {
+            "name": "addpropos",
+            "type": "addpropos"
+        },
+        {
+            "name": "addproposdn",
+            "type": "addproposdn"
+        },
+        {
+            "name": "addtspec",
+            "type": "addtspec"
+        },
+        {
+            "name": "approvetspec",
+            "type": "approvetspec"
+        },
+        {
+            "name": "cancelwork",
+            "type": "cancelwork"
+        },
+        {
+            "name": "createpool",
+            "type": "createpool"
+        },
+        {
+            "name": "dapprovetspec",
+            "type": "dapprovetspec"
+        },
+        {
+            "name": "delcomment",
+            "type": "delcomment"
+        },
+        {
+            "name": "delpropos",
+            "type": "delpropos"
+        },
+        {
+            "name": "deltspec",
+            "type": "deltspec"
+        },
+        {
+            "name": "editcomment",
+            "type": "editcomment"
+        },
+        {
+            "name": "editpropos",
+            "type": "editpropos"
+        },
+        {
+            "name": "edittspec",
+            "type": "edittspec"
+        },
+        {
+            "name": "poststatus",
+            "type": "poststatus"
+        },
+        {
+            "name": "reviewwork",
+            "type": "reviewwork"
+        },
+        {
+            "name": "startwork",
+            "type": "startwork"
+        },
+        {
+            "name": "votepropos",
+            "type": "votepropos"
+        },
+        {
+            "name": "withdraw",
+            "type": "withdraw"
+        }
+    ],
+    "tables": [
+        {
+            "name": "funds",
+            "type": "fund_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "owner", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "proposals",
+            "type": "proposal_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "proposalsc",
+            "type": "comment_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }, {
+                "name": "foreign",
+                "unique": false,
+                "orders": [{"field": "foreign_id", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "proposalstsv",
+            "type": "vote_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }, {
+                "name": "foreign",
+                "unique": false,
+                "orders": [{"field": "foreign_id", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "proposalsv",
+            "type": "vote_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }, {
+                "name": "foreign",
+                "unique": false,
+                "orders": [{"field": "foreign_id", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "reviewc",
+            "type": "comment_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }, {
+                "name": "foreign",
+                "unique": false,
+                "orders": [{"field": "foreign_id", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "state",
+            "type": "state_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "statusc",
+            "type": "comment_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }, {
+                "name": "foreign",
+                "unique": false,
+                "orders": [{"field": "foreign_id", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "tspecappc",
+            "type": "comment_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }, {
+                "name": "foreign",
+                "unique": false,
+                "orders": [{"field": "foreign_id", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "tspecrv",
+            "type": "vote_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }, {
+                "name": "foreign",
+                "unique": false,
+                "orders": [{"field": "foreign_id", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "tspecs",
+            "type": "tspec_app_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }, {
+                "name": "foreign",
+                "unique": false,
+                "orders": [{"field": "foreign_id", "order": "asc"}]
+            }]
+        }
+    ],
+    "variants": []
+}

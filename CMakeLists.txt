@@ -1,0 +1,75 @@
+cmake_minimum_required(VERSION 3.5)
+
+if (NOT DEFINED PROJECT_NAME)
+    project(golos_worker_contract VERSION 0.1.0)
+endif(NOT DEFINED PROJECT_NAME)
+
+set(EOSIO_CDT_VERSION_MIN "1.6")
+set(EOSIO_CDT_VERSION_SOFT_MAX "1.7")
+#set(EOSIO_CDT_VERSION_HARD_MAX "")
+
+find_package(eosio.cdt)
+
+### Check the version of eosio.cdt
+set(VERSION_MATCH_ERROR_MSG "")
+EOSIO_CHECK_VERSION(VERSION_OUTPUT "${EOSIO_CDT_VERSION}"
+                                   "${EOSIO_CDT_VERSION_MIN}"
+                                   "${EOSIO_CDT_VERSION_SOFT_MAX}"
+                                   "${EOSIO_CDT_VERSION_HARD_MAX}"
+                                   VERSION_MATCH_ERROR_MSG)
+if(VERSION_OUTPUT STREQUAL "MATCH")
+   message(STATUS "Using eosio.cdt version ${EOSIO_CDT_VERSION}")
+elseif(VERSION_OUTPUT STREQUAL "WARN")
+   message(WARNING "Using eosio.cdt version ${EOSIO_CDT_VERSION} even though it exceeds the maximum supported version of ${EOSIO_CDT_VERSION_SOFT_MAX}; continuing with configuration, however build may fail.\nIt is recommended to use eosio.cdt version ${EOSIO_CDT_VERSION_SOFT_MAX}.x")
+else() # INVALID OR MISMATCH
+   message(FATAL_ERROR "Found eosio.cdt version ${EOSIO_CDT_VERSION} but it does not satisfy version requirements: ${VERSION_MATCH_ERROR_MSG}\nPlease use eosio.cdt version ${EOSIO_CDT_VERSION_SOFT_MAX}.x")
+endif(VERSION_OUTPUT STREQUAL "MATCH")
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+   set(TEST_BUILD_TYPE "Debug")
+   set(CMAKE_BUILD_TYPE "Release")
+else()
+   set(TEST_BUILD_TYPE ${CMAKE_BUILD_TYPE})
+endif()
+
+if (NOT DEFINED TOKEN_INCLUDE_PATH)
+    set(TOKEN_INCLUDE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cyberway.contracts/cyber.token/include")
+endif(NOT DEFINED TOKEN_INCLUDE_PATH)
+
+if (NOT DEFINED TOKEN_HEADER_FILE)
+    set(TOKEN_HEADER_FILE "cyber.token/cyber.token.hpp")
+endif(NOT DEFINED TOKEN_HEADER_FILE)
+
+if (NOT DEFINED TOKEN_CLASS)
+    set(TOKEN_CLASS "eosio::token")
+endif(NOT DEFINED TOKEN_CLASS)
+
+if (NOT DEFINED TOKEN_NAME)
+    set(TOKEN_NAME "cyber.token")
+endif(NOT DEFINED TOKEN_NAME)
+
+# if (NOT DEFINED VESTING_NAME)
+#    set(VESTING_NAME "gls.vesting")
+# endif(NOT DEFINED VESTING_NAME)
+
+# configure_file(${CMAKE_CURRENT_SOURCE_DIR}/common/config.hpp.in ${CMAKE_CURRENT_SOURCE_DIR}/common/config.hpp)
+
+# include_directories(AFTER ${BOOST_ROOT}/include)
+
+macro(add_contract_with_abi TARGET ABIFILE)
+   add_executable( ${TARGET}.wasm ${ARGN} )
+   configure_file(${ABIFILE} ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.abi COPYONLY)
+   install (TARGETS ${TARGET}.wasm DESTINATION ${CMAKE_INSTALL_PREFIX}/${TARGET}/)
+   install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.abi DESTINATION ${CMAKE_INSTALL_PREFIX}/${TARGET}/)
+endmacro()
+
+add_subdirectory(golos.worker)
+
+if (APPLE)
+   set(OPENSSL_ROOT "/usr/local/opt/openssl")
+elseif (UNIX)
+   set(OPENSSL_ROOT "/usr/include/openssl")
+endif()
+set(SECP256K1_ROOT "/usr/local")
+
+include(UnitTestsExternalProject.txt)
