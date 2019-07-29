@@ -378,32 +378,8 @@
                     "type": "uint8"
                 },
                 {
-                    "name": "fund_name",
-                    "type": "name"
-                },
-                {
-                    "name": "deposit",
-                    "type": "asset"
-                },
-                {
                     "name": "tspec_id",
                     "type": "tspec_id_t"
-                },
-                {
-                    "name": "worker",
-                    "type": "name"
-                },
-                {
-                    "name": "work_begining_time",
-                    "type": "uint64"
-                },
-                {
-                    "name": "worker_payments_count",
-                    "type": "uint8"
-                },
-                {
-                    "name": "payment_begining_time",
-                    "type": "uint64"
                 },
                 {
                     "name": "created",
@@ -492,6 +468,30 @@
                 {
                     "name": "data",
                     "type": "tspec_data_t"
+                },
+                {
+                    "name": "fund_name",
+                    "type": "name"
+                },
+                {
+                    "name": "deposit",
+                    "type": "asset"
+                },
+                {
+                    "name": "worker",
+                    "type": "name"
+                },
+                {
+                    "name": "work_begining_time",
+                    "type": "uint64"
+                },
+                {
+                    "name": "worker_payments_count",
+                    "type": "uint8"
+                },
+                {
+                    "name": "payment_begining_time",
+                    "type": "uint64"
                 },
                 {
                     "name": "created",

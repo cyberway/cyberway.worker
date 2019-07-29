@@ -160,7 +160,7 @@ public:
 
         BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
         // if technical specification application was upvoted, `tspec_deposit` should be deposited from the application fund
-        BOOST_REQUIRE_EQUAL(worker.get_proposal(proposal_id)["deposit"].as<asset>(), tspec_deposit);
+        BOOST_REQUIRE_EQUAL(worker.get_tspec(tspec_app_id)["deposit"].as<asset>(), tspec_deposit);
         BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_app_id), STATE_APPROVED);
 
         /* ok,technical specification application has been choosen,
