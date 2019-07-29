@@ -14,9 +14,8 @@
 
 #include <cyberway.contracts/cyber.token/include/cyber.token/cyber.token.hpp>
 #include <cyberway.contracts/common/dispatchers.hpp>
-#include "external.hpp"
+#include "config.hpp"
 
-namespace cfg = cyber::config;
 using namespace eosio;
 using namespace std;
 

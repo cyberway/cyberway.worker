@@ -1,5 +1,7 @@
 #include "golos.worker.hpp"
 
+namespace config = golos::config;
+
 namespace golos
 {
 
@@ -49,7 +51,7 @@ void worker::pay_tspec_author(proposal_t& proposal) {
     proposal.deposit -= tspec.specification_cost;
 
     action(permission_level{_self, "active"_n},
-           cfg::token_name,
+           config::token_name,
            "transfer"_n,
            std::make_tuple(_self, tspec_app.author,
                            tspec.specification_cost,
@@ -287,7 +289,7 @@ void worker::approvetspec(tspec_id_t tspec_app_id, eosio::name author, comment_i
     _proposal_tspec_votes.approve(tspec_app_id, author);
 
     const size_t positive_votes_count = _proposal_tspec_votes.count_positive(tspec_app_id);
-    if (positive_votes_count >= witness_count_51)
+    if (positive_votes_count >= config::witness_count_51)
     {
         //TODO: check that all voters are delegates in this moment
         LOG("technical specification % got % positive votes", tspec_app_id, positive_votes_count);
@@ -398,7 +400,7 @@ void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t s
                      "invalid state for negative review");
 
         size_t negative_votes_count = _tspec_review_votes.count_negative(tspec_app_id);
-        if (negative_votes_count >= wintess_count_75)
+        if (negative_votes_count >= config::witness_count_75)
         {
             //TODO: check that all voters are delegates in this moment
             LOG("work has been rejected by the delegates voting, got % negative votes", negative_votes_count);
@@ -412,7 +414,7 @@ void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t s
         eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW, "invalid state for positive review");
 
         size_t positive_votes_count = _tspec_review_votes.count_positive(tspec_app_id);
-        if (positive_votes_count >= witness_count_51)
+        if (positive_votes_count >= config::witness_count_51)
         {
             //TODO: check that all voters are delegates in this moment
             LOG("work has been accepted by the delegates voting, got % positive votes", positive_votes_count);
@@ -483,7 +485,7 @@ void worker::withdraw(tspec_id_t tspec_app_id) {
     });
 
     action(permission_level{_self, "active"_n},
-           cfg::token_name, "transfer"_n,
+           config::token_name, "transfer"_n,
            std::make_tuple(_self, proposal_ptr->worker,
                            quantity, std::string("worker reward")))
             .send();
@@ -524,7 +526,7 @@ void worker::on_transfer(name from, name to, eosio::asset quantity, std::string 
 
 } // golos
 
-DISPATCH_WITH_TRANSFER(golos::worker, cfg::token_name, on_transfer, (createpool)
+DISPATCH_WITH_TRANSFER(golos::worker, config::token_name, on_transfer, (createpool)
     (addproposdn)(addpropos)(editpropos)(delpropos)(votepropos)
     (addcomment)(editcomment)(delcomment)
     (addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)
