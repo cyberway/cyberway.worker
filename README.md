@@ -3,12 +3,12 @@ golos.worker
 
 Download:
 ```sh
-git clone https://github.com/GolosChain/golos.worker/ -b develop --recursive
+git clone https://github.com/cyberway/cyberway.worker/ -b develop --recursive
 ```
 
 Build:
 ```sh
-cd golos.worker
+cd cyberway.worker
 cd cyberway.contracts
 ./build.sh
 cd ..

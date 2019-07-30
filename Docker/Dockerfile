@@ -7,10 +7,10 @@ COPY --from=cdt /opt/cyberway.cdt /opt/cyberway.cdt
 COPY --from=cyberway /opt/cyberway /opt/cyberway
 
 ARG branch=master
-ADD https://api.github.com/repos/GolosChain/golos.worker/git/refs/heads/$branch /etc/version.json
-RUN git clone -b $branch https://github.com/GolosChain/golos.worker.git --recursive
+ADD https://api.github.com/repos/cyberway/cyberway.worker/git/refs/heads/$branch /etc/version.json
+RUN git clone -b $branch https://github.com/cyberway/cyberway.worker.git --recursive
 
-RUN cd golos.worker/cyberway.contracts \
+RUN cd cyberway.worker/cyberway.contracts \
     && echo ":$(git rev-parse HEAD)" > version \
     && cmake -H. -B"build" \
         -GNinja \
@@ -24,7 +24,7 @@ RUN cd golos.worker/cyberway.contracts \
     && cmake -H. -B"build" \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/opt/golos.worker/ \
+        -DCMAKE_INSTALL_PREFIX=/opt/cyberway.worker/ \
         -Deosio.cdt_DIR=/opt/cyberway.cdt/lib/cmake/eosio.cdt \
         -DEOSIO_ROOT=/opt/cyberway \
     && cmake --build build --target install
@@ -36,24 +36,24 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get -y install openssl ca-certificates python3 python3-numpy python3-bson libusb-1.0-0-dev libcurl4-gnutls-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /golos.worker/version /opt/golos.worker/version
-COPY --from=builder /opt/golos.worker/ /opt/golos.worker/
-COPY --from=builder /golos.worker/build/tests/unit_test /opt/golos.worker/unit_test
+COPY --from=builder /cyberway.worker/version /opt/cyberway.worker/version
+COPY --from=builder /opt/cyberway.worker/ /opt/cyberway.worker/
+COPY --from=builder /cyberway.worker/build/tests/unit_test /opt/cyberway.worker/unit_test
 
-COPY --from=builder /golos.worker/cyberway.contracts/version /opt/cyberway.contracts/version
+COPY --from=builder /cyberway.worker/cyberway.contracts/version /opt/cyberway.contracts/version
 COPY --from=builder /opt/cyberway.contracts/ /opt/cyberway.contracts/
-COPY --from=builder /golos.worker/cyberway.contracts/build/tests/unit_test /opt/cyberway.contracts/unit_test
-COPY --from=builder /golos.worker/cyberway.contracts/tests/test_contracts /opt/cyberway.contracts/test_contracts
+COPY --from=builder /cyberway.worker/cyberway.contracts/build/tests/unit_test /opt/cyberway.contracts/unit_test
+COPY --from=builder /cyberway.worker/cyberway.contracts/tests/test_contracts /opt/cyberway.contracts/test_contracts
 
-COPY --from=builder /golos.worker/cyberway.contracts/scripts/bios-boot-sequence /opt/cyberway.contracts/scripts/bios-boot-sequence
+COPY --from=builder /cyberway.worker/cyberway.contracts/scripts/bios-boot-sequence /opt/cyberway.contracts/scripts/bios-boot-sequence
 
 COPY --from=builder /usr/local/lib/libbson-1.0.so.0.0.0 /usr/local/lib/
 COPY --from=cyberway /opt/cyberway/bin/cleos /opt/cyberway/bin/cleos
 COPY --from=cyberway /opt/cyberway/bin/keosd /opt/cyberway/bin/keosd
 COPY --from=cyberway /opt/cyberway/bin/create-genesis /opt/cyberway/bin/create-genesis
 
-RUN ldconfig && ln -s ../cyberway.contracts /opt/golos.worker/cyberway.contracts
+RUN ldconfig && ln -s ../cyberway.contracts /opt/cyberway.worker/cyberway.contracts
 
 ENV CYBERWAY_TEST_CONTRACTS /opt/cyberway.contracts/test_contracts/
 ENV CYBERWAY_CONTRACTS /opt/cyberway.contracts/
-ENV GOLOS_CONTRACTS /opt/golos.worker/
+ENV GOLOS_CONTRACTS /opt/cyberway.worker/
