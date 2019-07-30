@@ -242,11 +242,22 @@ public:
             STATE_CLOSED
         };
 
+        enum review_status_t {
+            STATUS_REJECT = 0,
+            STATUS_ACCEPT = 1
+        };
+
         tspec_id_t id;
         tspec_id_t foreign_id;
         eosio::name author;
         uint8_t state;
         tspec_data_t data;
+        eosio::name fund_name;
+        asset deposit;
+        eosio::name worker;
+        uint64_t work_begining_time;
+        uint8_t worker_payments_count;
+        uint64_t payment_begining_time;
         uint64_t created;
         uint64_t modified;
 
@@ -269,11 +280,6 @@ public:
             STATE_TSPEC_CHOSE
         };
 
-        enum review_status_t {
-            STATUS_REJECT = 0,
-            STATUS_ACCEPT = 1
-        };
-
         enum type_t {
             TYPE_TASK,
             TYPE_DONE
@@ -283,13 +289,7 @@ public:
         eosio::name author;
         uint8_t type;
         uint8_t state;
-        eosio::name fund_name;
-        asset deposit;
         tspec_id_t tspec_id;
-        eosio::name worker;
-        uint64_t work_begining_time;
-        uint8_t worker_payments_count;
-        uint64_t payment_begining_time;
         uint64_t created;
         uint64_t modified;
 
@@ -326,10 +326,10 @@ protected:
     auto get_state();
     const auto get_proposal(proposal_id_t proposal_id);
 
-    void deposit(proposal_t &proposal);
+    void deposit(tspec_app_t& tspec_app);
     void choose_proposal_tspec(proposal_t & proposal, const tspec_app_t &tspec_app);
-    void pay_tspec_author(proposal_t & proposal);
-    void refund(proposal_t & proposal, eosio::name modifier);
+    void pay_tspec_author(tspec_app_t& tspec_app);
+    void refund(tspec_app_t& tspec_app, eosio::name modifier);
     void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal);
     void del_tspec(const tspec_app_t &tspec_app);
 public:
