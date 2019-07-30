@@ -13,4 +13,4 @@ else
 fi
 
 cd Docker
-docker build -t cyberway/golos.worker:${IMAGETAG} --build-arg branch=${BRANCHNAME} --build-arg buildtype=${BUILDTYPE} .
+docker build -t cyberway/cyberway.worker:${IMAGETAG} --build-arg branch=${BRANCHNAME} --build-arg buildtype=${BUILDTYPE} .
