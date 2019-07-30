@@ -1,5 +1,11 @@
 #include "golos.worker.hpp"
 
+#define CHECK_POST(post_id) { \
+    auto post = _comments.find(post_id); \
+    eosio::check(post != _comments.end(), "comment not exists"); \
+    eosio::check(post->parent_id == COMMENT_ROOT, "comment is not root"); \
+}
+
 namespace config = golos::config;
 
 namespace golos
@@ -84,7 +90,6 @@ void worker::close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::
 
 void worker::del_tspec(const tspec_app_t& tspec_app) {
     _proposal_tspec_votes.erase_all(tspec_app.id);
-    _proposal_tspec_comments.erase_all(tspec_app.id);
     _proposal_tspecs.erase(tspec_app);
 }
 
@@ -96,13 +101,16 @@ void worker::createpool(eosio::symbol token_symbol) {
     _state.set(state, _self);
 }
 
-void worker::addpropos(proposal_id_t proposal_id, const eosio::name& author, const string& title, const string& description) {
+void worker::addpropos(proposal_id_t proposal_id, const eosio::name& author, comment_id_t comment) {
     require_app_member(author);
+
+    CHECK_POST(comment);
 
     _proposals.emplace(author, [&](auto &o) {
         o.id = proposal_id;
         o.type = proposal_t::TYPE_TASK;
         o.author = author;
+        o.comment = comment;
 
         o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
         o.created = TIMESTAMP_NOW;
@@ -110,9 +118,11 @@ void worker::addpropos(proposal_id_t proposal_id, const eosio::name& author, con
     });
 }
 
-void worker::addproposdn(proposal_id_t proposal_id, const eosio::name &author, const eosio::name &worker, const string &title,
-    const string& description, const tspec_data_t& tspec, const string& tspec_text, const comment_id_t comment_id, const comment_data_t& comment) {
+void worker::addproposdn(proposal_id_t proposal_id, const eosio::name& author, comment_id_t comment, const eosio::name& worker,
+        const tspec_data_t& tspec) {
     require_app_member(author);
+
+    CHECK_POST(comment);
 
     tspec_id_t tspec_id = _proposal_tspecs.available_primary_key();
 
@@ -120,6 +130,7 @@ void worker::addproposdn(proposal_id_t proposal_id, const eosio::name &author, c
         o.id = proposal_id;
         o.type = proposal_t::TYPE_DONE;
         o.author = author;
+        o.comment = comment;
         o.tspec_id = tspec_id;
 
         o.state = (uint8_t)proposal_t::STATE_TSPEC_CHOSE;
@@ -131,6 +142,7 @@ void worker::addproposdn(proposal_id_t proposal_id, const eosio::name &author, c
         obj.id = tspec_id;
         obj.foreign_id = proposal_id;
         obj.author = author;
+        obj.comment = comment;
         obj.data = tspec;
         obj.fund_name = _self;
         obj.worker = worker;
@@ -141,16 +153,13 @@ void worker::addproposdn(proposal_id_t proposal_id, const eosio::name &author, c
 
         obj.set_state(tspec_app_t::STATE_DELEGATES_REVIEW);
     });
-
-    _proposal_status_comments.add(comment_id, proposal_id, author, comment);
 }
 
-void worker::editpropos(proposal_id_t proposal_id, string title, string description)
+void worker::editpropos(proposal_id_t proposal_id) // TODO: changing type
 {
     auto proposal_ptr = get_proposal(proposal_id);
     require_app_member(proposal_ptr->author);
     eosio::check(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for editpropos");
-    eosio::check(!(description.empty() && title.empty()), "invalid arguments");
 
     _proposals.modify(proposal_ptr, proposal_ptr->author, [&](auto &o) {
         o.modified = TIMESTAMP_NOW;
@@ -171,9 +180,6 @@ void worker::delpropos(proposal_id_t proposal_id) {
         eosio::check(_proposal_tspec_votes.count_positive(tspec_ptr->id) == 0, "proposal contains partly-approved technical specification applications");
     }
 
-    _proposal_comments.erase_all(proposal_id);
-    _proposal_review_comments.erase_all(proposal_id);
-    _proposal_status_comments.erase_all(proposal_id);
     _proposal_votes.erase_all(proposal_id);
 
     for (auto tspec_ptr = tspec_lower_bound; tspec_ptr != tspec_index.upper_bound(proposal_id); ) {
@@ -197,30 +203,41 @@ void worker::votepropos(proposal_id_t proposal_id, eosio::name voter, uint8_t po
     _proposal_votes.vote(vote);
 }
 
-void worker::addcomment(proposal_id_t proposal_id, comment_id_t comment_id, eosio::name author, const comment_data_t &data) {
-    const proposal_t &proposal = _proposals.get(proposal_id);
-
-    _proposal_comments.add(comment_id, proposal_id, author, data);
+void worker::addcomment(comment_id_t comment_id, eosio::name author, comment_id_t parent_id, const string& text) {
+    require_auth(author);
+    eosio::check(!text.empty(), "comment cannot be empty");
+    eosio::check(comment_id != COMMENT_ROOT && _comments.find(comment_id) == _comments.end(), "comment exists");
+    eosio::check(parent_id == COMMENT_ROOT || _comments.find(parent_id) != _comments.end(), "parent comment not exists");
+    _comments.emplace(author, [&](auto &obj) {
+        obj.id = comment_id;
+        obj.author = author;
+        obj.parent_id = parent_id;
+    });
 }
 
-void worker::editcomment(comment_id_t comment_id, const comment_data_t& data) {
-    const proposal_id_t proposal_id = _proposal_comments.comments.get(comment_id).foreign_id;
-    const proposal_t& proposal = _proposals.get(proposal_id);
-
-    _proposal_comments.edit(comment_id, data);
+void worker::editcomment(comment_id_t comment_id, const string& text) {
+    eosio::check(!text.empty(), "comment cannot be empty");
+    const auto& comment = _comments.get(comment_id);
+    require_auth(comment.author);
 }
 
 void worker::delcomment(comment_id_t comment_id) {
-    const proposal_id_t proposal_id = _proposal_comments.comments.get(comment_id).foreign_id;
-    const proposal_t &proposal = _proposals.get(proposal_id);
+    const auto& comment = _comments.get(comment_id);
+    require_auth(comment.author);
 
-    _proposal_comments.del(comment_id);
+    auto index = _comments.get_index<name("parent")>();
+    auto ptr = index.lower_bound(comment_id);
+    eosio::check(ptr == index.end(), "cannot delete comment with child comments");
+
+    _comments.erase(comment);
 }
 
-void worker::addtspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, eosio::name author, const tspec_data_t& tspec, const string& tspec_text) {
+void worker::addtspec(tspec_id_t tspec_app_id, eosio::name author, proposal_id_t proposal_id, comment_id_t comment, const tspec_data_t& tspec) {
     auto proposal_ptr = get_proposal(proposal_id);
     eosio::check(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
     eosio::check(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for addtspec");
+
+    CHECK_POST(comment);
 
     eosio::check(get_state().token_symbol == tspec.specification_cost.symbol, "invalid symbol for the specification cost");
     eosio::check(get_state().token_symbol == tspec.development_cost.symbol, "invalid symbol for the development cost");
@@ -228,6 +245,7 @@ void worker::addtspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, eosio:
     _proposal_tspecs.emplace(author, [&](tspec_app_t &spec) {
         spec.id = tspec_app_id;
         spec.author = author;
+        spec.comment = comment;
         spec.fund_name = _self;
         spec.data = tspec;
         spec.foreign_id = proposal_id;
@@ -236,7 +254,7 @@ void worker::addtspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, eosio:
     });
 }
 
-void worker::edittspec(tspec_id_t tspec_app_id, const tspec_data_t& tspec, const string& tspec_text) {
+void worker::edittspec(tspec_id_t tspec_app_id, const tspec_data_t& tspec) {
     const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
     const auto& proposal = _proposals.get(tspec_app.foreign_id);
 
@@ -270,7 +288,7 @@ void worker::deltspec(tspec_id_t tspec_app_id)
     del_tspec(tspec_app);
 }
 
-void worker::approvetspec(tspec_id_t tspec_app_id, eosio::name author, comment_id_t comment_id, const comment_data_t& comment) {
+void worker::approvetspec(tspec_id_t tspec_app_id, eosio::name author) {
     const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
     auto proposal_id = tspec_app.foreign_id;
     const auto& proposal = _proposals.get(proposal_id);
@@ -280,11 +298,6 @@ void worker::approvetspec(tspec_id_t tspec_app_id, eosio::name author, comment_i
 
     require_app_delegate(author);
     eosio::check(eosio::current_time_point().sec_since_epoch() <= tspec_app.created + voting_time_s, "approve time is over");
-
-    if (!comment.text.empty())
-    {
-        _proposal_tspec_comments.add(comment_id, tspec_app_id, author, comment);
-    }
 
     _proposal_tspec_votes.approve(tspec_app_id, author);
 
@@ -353,16 +366,7 @@ void worker::cancelwork(tspec_id_t tspec_app_id, eosio::name initiator) {
     close_tspec(initiator, tspec_app, tspec_app_t::STATE_CLOSED, *proposal_ptr);
 }
 
-void worker::poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t& comment) {
-    auto proposal_ptr = get_proposal(proposal_id);
-    const auto& tspec_app = _proposal_tspecs.get(proposal_ptr->tspec_id);
-    eosio::check(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for poststatus");
-    eosio::check(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
-    require_auth(tspec_app.worker);
-    _proposal_status_comments.add(comment_id, proposal_ptr->id, tspec_app.worker, comment);
-}
-
-void worker::acceptwork(tspec_id_t tspec_app_id, comment_id_t comment_id, const comment_data_t& comment) {
+void worker::acceptwork(tspec_id_t tspec_app_id, comment_id_t comment) {
     const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
     require_auth(tspec_app.author);
     eosio::check(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for acceptwork");
@@ -370,14 +374,15 @@ void worker::acceptwork(tspec_id_t tspec_app_id, comment_id_t comment_id, const 
     auto proposal_ptr = get_proposal(tspec_app.foreign_id);
     eosio::check(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
 
+    CHECK_POST(comment);
+
     _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](auto& tspec) {
         tspec.set_state(tspec_app_t::STATE_DELEGATES_REVIEW);
+        tspec.result_comment = comment;
     });
-
-    _proposal_status_comments.add(comment_id, proposal_ptr->id, tspec_app.author, comment);
 }
 
-void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t status, comment_id_t comment_id, const comment_data_t& comment) {
+void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t status) {
     require_app_delegate(reviewer);
 
     const auto& tspec = _proposal_tspecs.get(tspec_app_id);
@@ -520,5 +525,5 @@ void worker::on_transfer(name from, name to, eosio::asset quantity, std::string 
 DISPATCH_WITH_TRANSFER(golos::worker, config::token_name, on_transfer, (createpool)
     (addproposdn)(addpropos)(editpropos)(delpropos)(votepropos)
     (addcomment)(editcomment)(delcomment)
-    (addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw)
+    (addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(acceptwork)(reviewwork)(cancelwork)(withdraw)
 )
