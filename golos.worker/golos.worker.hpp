@@ -33,69 +33,14 @@ public:
     static constexpr uint32_t voting_time_s = 7 * 24 * 3600;
 
     using comment_id_t = uint64_t;
-    struct comment_data_t {
-        string text;
-    };
+    #define COMMENT_ROOT 0
     struct [[eosio::table]] comment_t {
         comment_id_t id;
-        uint64_t foreign_id;
+        comment_id_t parent_id;
         eosio::name author;
-        comment_data_t data;
-        uint64_t created;
-        uint64_t modified;
 
         uint64_t primary_key() const { return id; }
-        uint64_t get_secondary_1() const { return foreign_id; }
-    };
-
-    template <eosio::name::raw TableName>
-    struct comments_module_t {
-        multi_index<TableName, comment_t,
-            indexed_by<"foreign"_n,
-                const_mem_fun<comment_t, uint64_t, &comment_t::get_secondary_1>>> comments;
-
-        comments_module_t(eosio::name code, uint64_t scope) : comments(code, scope) {}
-
-        void add(comment_id_t id, uint64_t foreign_id, eosio::name author, const comment_data_t &data)
-        {
-            eosio::check(comments.find(id) == comments.end(), "comment exists");
-            comments.emplace(author, [&](auto &obj) {
-                obj.id = id;
-                obj.author = author;
-                obj.data = data;
-                obj.foreign_id = foreign_id;
-                obj.created = TIMESTAMP_NOW;
-                obj.modified = TIMESTAMP_UNDEFINED;
-            });
-        }
-
-        void del(comment_id_t id)
-        {
-            const auto& comment = comments.get(id);
-            require_auth(comment.author);
-            comments.erase(comment);
-        }
-
-        void edit(comment_id_t id, const comment_data_t &data)
-        {
-            eosio::check(!data.text.empty(), "nothing to change");
-            const auto &comment = comments.get(id);
-            require_auth(comment.author);
-
-            comments.modify(comment, comment.author, [&](comment_t &obj) {
-                obj.data.text = data.text;
-            });
-        }
-
-        void erase_all(uint64_t foreign_id) {
-            auto index = comments.template get_index<name("foreign")>();
-            auto ptr = index.lower_bound(foreign_id);
-            while (ptr != index.upper_bound(foreign_id)) {
-                comment_id_t id = ptr->id;
-                ptr++;
-                comments.erase(comments.get(id));
-            }
-        }
+        uint64_t get_secondary_1() const { return parent_id; }
     };
 
     struct [[eosio::table]] vote_t {
@@ -250,12 +195,14 @@ public:
         tspec_id_t id;
         tspec_id_t foreign_id;
         eosio::name author;
+        comment_id_t comment;
         uint8_t state;
         tspec_data_t data;
         eosio::name fund_name;
         asset deposit;
         eosio::name worker;
         uint64_t work_begining_time;
+        comment_id_t result_comment;
         uint8_t worker_payments_count;
         uint64_t payment_begining_time;
         uint64_t created;
@@ -287,6 +234,7 @@ public:
 
         proposal_id_t id;
         eosio::name author;
+        comment_id_t comment;
         uint8_t type;
         uint8_t state;
         tspec_id_t tspec_id;
@@ -310,13 +258,10 @@ public:
         uint64_t primary_key() const { return owner.value; }
     };
     multi_index<"funds"_n, fund_t> _funds;
-
-    comments_module_t<"proposalsc"_n> _proposal_comments;
+    multi_index<"comments"_n, comment_t,
+        indexed_by<"parent"_n, const_mem_fun<comment_t, uint64_t, &comment_t::get_secondary_1>>> _comments;
     voting_module_t<"proposalsv"_n> _proposal_votes;
     approve_module_t<"proposalstsv"_n> _proposal_tspec_votes;
-    comments_module_t<"tspecappc"_n> _proposal_tspec_comments;
-    comments_module_t<"statusc"_n> _proposal_status_comments;
-    comments_module_t<"reviewc"_n> _proposal_review_comments;
     voting_module_t<"tspecrv"_n> _tspec_review_votes;
 
 protected:
@@ -336,40 +281,35 @@ public:
     worker(eosio::name receiver, eosio::name code, eosio::datastream<const char *> ds) : contract(receiver, code, ds),
         _state(_self, _self.value),
         _proposals(_self, _self.value),
-        _funds(_self, _self.value),
-        _proposal_comments(_self, _self.value),
+        _funds(_self, _self.value),   
+        _comments(_self, _self.value),
         _proposal_votes(_self, _self.value),
-        _proposal_status_comments(_self, _self.value),
-        _proposal_review_comments(_self, _self.value),
         _tspec_review_votes(_self, _self.value),
         _proposal_tspecs(_self, _self.value),
-        _proposal_tspec_comments(_self, _self.value),
         _proposal_tspec_votes(_self, _self.value) {}
 
     [[eosio::action]] void createpool(eosio::symbol token_symbol);
 
-    [[eosio::action]] void addpropos(proposal_id_t proposal_id, const eosio::name& author, const string& title, const string& description);
-    [[eosio::action]] void addproposdn(proposal_id_t proposal_id, const eosio::name &author, const eosio::name &worker,
-        const string &title, const string &description, const tspec_data_t &tspec,const string& tspec_text,
-        const comment_id_t comment_id, const comment_data_t &comment);
-    [[eosio::action]] void editpropos(proposal_id_t proposal_id, string title, string description);
+    [[eosio::action]] void addpropos(proposal_id_t proposal_id, const eosio::name& author, comment_id_t comment);
+    [[eosio::action]] void addproposdn(proposal_id_t proposal_id, const eosio::name& author, comment_id_t comment, const eosio::name& worker,
+        const tspec_data_t& tspec);
+    [[eosio::action]] void editpropos(proposal_id_t proposal_id);
     [[eosio::action]] void delpropos(proposal_id_t proposal_id);
     [[eosio::action]] void votepropos(proposal_id_t proposal_id, eosio::name voter, uint8_t positive);
 
-    [[eosio::action]] void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, eosio::name author, const comment_data_t &data);
-    [[eosio::action]] void editcomment(comment_id_t comment_id, const comment_data_t &data);
+    [[eosio::action]] void addcomment(comment_id_t comment_id, eosio::name author, comment_id_t parent_id, const string& text);
+    [[eosio::action]] void editcomment(comment_id_t comment_id, const string& text);
     [[eosio::action]] void delcomment(comment_id_t comment_id);
 
-    [[eosio::action]] void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, eosio::name author, const tspec_data_t &tspec, const string& tspec_text);
-    [[eosio::action]] void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec, const string& tspec_text);
+    [[eosio::action]] void addtspec(tspec_id_t tspec_app_id, eosio::name author, proposal_id_t proposal_id, comment_id_t comment, const tspec_data_t& tspec);
+    [[eosio::action]] void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec);
     [[eosio::action]] void deltspec(tspec_id_t tspec_app_id);
-    [[eosio::action]] void approvetspec(tspec_id_t tspec_app_id, eosio::name author, comment_id_t comment_id, const comment_data_t &comment);
+    [[eosio::action]] void approvetspec(tspec_id_t tspec_app_id, eosio::name author);
     [[eosio::action]] void dapprovetspec(tspec_id_t tspec_app_id, eosio::name author);
     [[eosio::action]] void startwork(tspec_id_t tspec_app_id, eosio::name worker);
     [[eosio::action]] void cancelwork(tspec_id_t tspec_app_id, eosio::name initiator);
-    [[eosio::action]] void poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment);
-    [[eosio::action]] void acceptwork(tspec_id_t tspec_app_id, comment_id_t comment_id, const comment_data_t &comment);
-    [[eosio::action]] void reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t status, comment_id_t comment_id, const comment_data_t &comment);
+    [[eosio::action]] void acceptwork(tspec_id_t tspec_app_id, comment_id_t comment);
+    [[eosio::action]] void reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t status);
     [[eosio::action]] void withdraw(tspec_id_t tspec_app_id);
 
     void on_transfer(name from, name to, eosio::asset quantity, std::string memo);

@@ -24,12 +24,8 @@
                     "type": "tspec_id_t"
                 },
                 {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
-                },
-                {
                     "name": "comment",
-                    "type": "comment_data_t"
+                    "type": "comment_id_t"
                 }
             ]
         },
@@ -38,8 +34,8 @@
             "base": "",
             "fields": [
                 {
-                    "name": "proposal_id",
-                    "type": "proposal_id_t"
+                    "name": "parent_id",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "comment_id",
@@ -50,8 +46,8 @@
                     "type": "name"
                 },
                 {
-                    "name": "data",
-                    "type": "comment_data_t"
+                    "name": "text",
+                    "type": "string"
                 }
             ]
         },
@@ -68,12 +64,8 @@
                     "type": "name"
                 },
                 {
-                    "name": "title",
-                    "type": "string"
-                },
-                {
-                    "name": "description",
-                    "type": "string"
+                    "name": "comment",
+                    "type": "comment_id_t"
                 }
             ]
         },
@@ -88,6 +80,10 @@
                 {
                     "name": "author",
                     "type": "name"
+                },
+                {
+                    "name": "comment",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "worker",
@@ -108,14 +104,6 @@
                 {
                     "name": "tspec_text",
                     "type": "string"
-                },
-                {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
-                },
-                {
-                    "name": "comment",
-                    "type": "comment_data_t"
                 }
             ]
         },
@@ -123,10 +111,6 @@
             "name": "addtspec",
             "base": "",
             "fields": [
-                {
-                    "name": "proposal_id",
-                    "type": "proposal_id_t"
-                },
                 {
                     "name": "tspec_app_id",
                     "type": "tspec_id_t"
@@ -136,12 +120,16 @@
                     "type": "name"
                 },
                 {
-                    "name": "tspec",
-                    "type": "tspec_data_t"
+                    "name": "proposal_id",
+                    "type": "proposal_id_t"
                 },
                 {
-                    "name": "tspec_text",
-                    "type": "string"
+                    "name": "comment",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "tspec",
+                    "type": "tspec_data_t"
                 }
             ]
         },
@@ -156,14 +144,6 @@
                 {
                     "name": "author",
                     "type": "name"
-                },
-                {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
-                },
-                {
-                    "name": "comment",
-                    "type": "comment_data_t"
                 }
             ]
         },
@@ -200,24 +180,12 @@
                     "type": "comment_id_t"
                 },
                 {
-                    "name": "foreign_id",
-                    "type": "uint64"
+                    "name": "parent_id",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "author",
                     "type": "name"
-                },
-                {
-                    "name": "data",
-                    "type": "comment_data_t"
-                },
-                {
-                    "name": "created",
-                    "type": "uint64"
-                },
-                {
-                    "name": "modified",
-                    "type": "uint64"
                 }
             ]
         },
@@ -284,8 +252,8 @@
                     "type": "comment_id_t"
                 },
                 {
-                    "name": "data",
-                    "type": "comment_data_t"
+                    "name": "text",
+                    "type": "string"
                 }
             ]
         },
@@ -296,14 +264,6 @@
                 {
                     "name": "proposal_id",
                     "type": "proposal_id_t"
-                },
-                {
-                    "name": "title",
-                    "type": "string"
-                },
-                {
-                    "name": "description",
-                    "type": "string"
                 }
             ]
         },
@@ -318,10 +278,6 @@
                 {
                     "name": "tspec",
                     "type": "tspec_data_t"
-                },
-                {
-                    "name": "tspec_text",
-                    "type": "string"
                 }
             ]
         },
@@ -340,24 +296,6 @@
             ]
         },
         {
-            "name": "poststatus",
-            "base": "",
-            "fields": [
-                {
-                    "name": "proposal_id",
-                    "type": "proposal_id_t"
-                },
-                {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
-                },
-                {
-                    "name": "comment",
-                    "type": "comment_data_t"
-                }
-            ]
-        },
-        {
             "name": "proposal_t",
             "base": "",
             "fields": [
@@ -368,6 +306,10 @@
                 {
                     "name": "author",
                     "type": "name"
+                },
+                {
+                    "name": "comment",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "type",
@@ -406,14 +348,6 @@
                 {
                     "name": "status",
                     "type": "uint8"
-                },
-                {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
-                },
-                {
-                    "name": "comment",
-                    "type": "comment_data_t"
                 }
             ]
         },
@@ -462,6 +396,10 @@
                     "type": "name"
                 },
                 {
+                    "name": "comment",
+                    "type": "comment_id_t"
+                },
+                {
                     "name": "state",
                     "type": "uint8"
                 },
@@ -484,6 +422,10 @@
                 {
                     "name": "work_begining_time",
                     "type": "uint64"
+                },
+                {
+                    "name": "result_comment",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "worker_payments_count",
@@ -646,10 +588,6 @@
             "type": "edittspec"
         },
         {
-            "name": "poststatus",
-            "type": "poststatus"
-        },
-        {
             "name": "reviewwork",
             "type": "reviewwork"
         },
@@ -686,16 +624,16 @@
             }]
         },
         {
-            "name": "proposalsc",
+            "name": "comments",
             "type": "comment_t",
             "indexes": [{
                 "name": "primary",
                 "unique": true,
                 "orders": [{"field": "id", "order": "asc"}]
             }, {
-                "name": "foreign",
+                "name": "parent",
                 "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
+                "orders": [{"field": "parent_id", "order": "asc"}]
             }]
         },
         {
@@ -725,51 +663,12 @@
             }]
         },
         {
-            "name": "reviewc",
-            "type": "comment_t",
-            "indexes": [{
-                "name": "primary",
-                "unique": true,
-                "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "foreign",
-                "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
-            }]
-        },
-        {
             "name": "state",
             "type": "state_t",
             "indexes": [{
                 "name": "primary",
                 "unique": true,
                 "orders": [{"field": "id", "order": "asc"}]
-            }]
-        },
-        {
-            "name": "statusc",
-            "type": "comment_t",
-            "indexes": [{
-                "name": "primary",
-                "unique": true,
-                "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "foreign",
-                "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
-            }]
-        },
-        {
-            "name": "tspecappc",
-            "type": "comment_t",
-            "indexes": [{
-                "name": "primary",
-                "unique": true,
-                "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "foreign",
-                "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
             }]
         },
         {
