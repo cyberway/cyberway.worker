@@ -15,7 +15,7 @@ docker-compose up -d
 
 # Run unit-tests
 sleep 10s
-docker run --network golos-tests_contracts-net -ti cyberway/golos.worker:$IMAGETAG  /bin/bash -c 'export MONGO_URL=mongodb://mongo:27017; /opt/golos.worker/unit_test -l message -r detailed'
+docker run --network golos-tests_contracts-net -ti cyberway/cyberway.worker:$IMAGETAG  /bin/bash -c 'export MONGO_URL=mongodb://mongo:27017; /opt/cyberway.worker/unit_test -l message -r detailed'
 result=$?
 
 docker-compose down
