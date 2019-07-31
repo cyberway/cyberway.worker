@@ -336,7 +336,7 @@ void worker::startwork(tspec_id_t tspec_app_id, eosio::name worker) {
 
 void worker::cancelwork(tspec_id_t tspec_app_id, eosio::name initiator) {
     const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
-    eosio::check(tspec_app.state == tspec_app_t::STATE_WORK || tspec_app.state == tspec_app_t::STATE_WIP, "invalid state for cancelwork");
+    eosio::check(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state");
 
     if (initiator == tspec_app.worker)
     {
@@ -347,13 +347,11 @@ void worker::cancelwork(tspec_id_t tspec_app_id, eosio::name initiator) {
         require_auth(tspec_app.author);
     }
 
-    // TODO: cancelwork fixed in #51
     _proposal_tspecs.modify(tspec_app, initiator, [&](auto& tspec) {
-        refund(tspec, initiator);
+        tspec.set_state(tspec_app_t::STATE_APPROVED);
+        tspec.worker = name();
+        tspec.work_begining_time = TIMESTAMP_UNDEFINED;
     });
-
-    auto proposal_ptr = get_proposal(tspec_app.foreign_id);
-    close_tspec(initiator, tspec_app, tspec_app_t::STATE_CLOSED_BY_WITNESSES, *proposal_ptr);
 }
 
 void worker::acceptwork(tspec_id_t tspec_app_id, comment_id_t comment_id) {
