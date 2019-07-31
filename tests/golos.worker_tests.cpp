@@ -47,7 +47,8 @@ enum tspec_state_t {
     STATE_DELEGATES_REVIEW,
     STATE_PAYMENT,
     STATE_PAYMENT_COMPLETE,
-    STATE_CLOSED
+    STATE_CLOSED_BY_AUTHOR,
+    STATE_CLOSED_BY_WITNESSES
 };
 
 class golos_worker_tester : public golos_tester {
@@ -602,13 +603,21 @@ try
     BOOST_REQUIRE_EQUAL(worker.get_comments().size(), relative_rows_count * 2 + 1); // comments + tspec posts + 1 proposal post
     BOOST_REQUIRE_EQUAL(worker.get_tspecs(worker_code_account).size(), relative_rows_count);
 
+    BOOST_REQUIRE_EQUAL(worker.push_action(proposal_author, N(delpropos), mvo()
+        ("proposal_id", proposal_id)), wasm_assert_msg("proposal has tspecs"));
+
+    for (uint64_t j = 0; j < relative_rows_count; j++) {
+        const uint64_t tspec_app_id = 100 + j;
+        ASSERT_SUCCESS(worker.push_action(tspec_author, N(deltspec), mvo()
+                ("tspec_app_id", tspec_app_id)));
+    }
+    BOOST_REQUIRE_EQUAL(worker.get_tspecs(worker_code_account).size(), 0);
+
     ASSERT_SUCCESS(worker.push_action(proposal_author, N(delpropos), mvo()
         ("proposal_id", proposal_id)));
 
     BOOST_REQUIRE_EQUAL(worker.get_proposals(worker_code_account).size(), 0);
     BOOST_REQUIRE_EQUAL(worker.get_comments().size(), relative_rows_count * 2 + 1); // comments + tspec posts + 1 proposal post
-    BOOST_REQUIRE_EQUAL(worker.get_tspecs(worker_code_account).size(), 0);
-
 }
 FC_LOG_AND_RETHROW()
 
@@ -746,7 +755,7 @@ try
         ("tspec_app_id", tspec_id)
         ("initiator", worker_account)));
 
-    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED_BY_WITNESSES);
     BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
     BOOST_REQUIRE_EQUAL(worker.push_action(worker_account, N(withdraw), mvo()
@@ -780,7 +789,7 @@ try
         ("tspec_app_id", tspec_id)
         ("initiator", tspec_author)));
 
-    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED_BY_WITNESSES);
     BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
     BOOST_REQUIRE_EQUAL(worker.push_action(worker_account, N(withdraw), mvo()
@@ -819,7 +828,7 @@ try
             ("status", 0)));
     }
 
-    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED);
+    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED_BY_WITNESSES);
     BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
     BOOST_REQUIRE_EQUAL(worker.push_action(worker_account, N(withdraw), mvo()

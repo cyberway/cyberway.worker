@@ -77,7 +77,7 @@ void worker::refund(tspec_app_t& tspec_app, eosio::name modifier) {
 }
 
 void worker::close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal) {
-    if (state == tspec_app_t::STATE_CLOSED && proposal.state > proposal_t::STATE_TSPEC_APP) {
+    if (state != tspec_app_t::STATE_PAYMENT_COMPLETE && proposal.state > proposal_t::STATE_TSPEC_APP) {
         _proposals.modify(proposal, payer, [&](proposal_t& proposal) {
             proposal.set_state(proposal_t::STATE_TSPEC_APP);
             // TODO: clear tspec_id
@@ -87,11 +87,11 @@ void worker::close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::
         tspec.set_state(state);
         refund(tspec, payer);
     });
-}
-
-void worker::del_tspec(const tspec_app_t& tspec_app) {
-    _proposal_tspec_votes.erase_all(tspec_app.id);
-    _proposal_tspecs.erase(tspec_app);
+    // TODO: do instead of modify
+    if (state == tspec_app_t::STATE_CLOSED_BY_AUTHOR
+            && _proposal_tspec_votes.empty(tspec_app.id) && _tspec_review_votes.empty(tspec_app.id)) {
+        _proposal_tspecs.erase(tspec_app);
+    }
 }
 
 void worker::createpool(eosio::symbol token_symbol) {
@@ -169,25 +169,13 @@ void worker::editpropos(proposal_id_t proposal_id) // TODO: changing type
 
 void worker::delpropos(proposal_id_t proposal_id) {
     auto proposal_ptr = get_proposal(proposal_id);
-    eosio::check(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for delpropos");
-    eosio::check(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
     require_app_member(proposal_ptr->author);
 
     auto tspec_index = _proposal_tspecs.get_index<"foreign"_n>();
-    auto tspec_lower_bound = tspec_index.lower_bound(proposal_id);
-
-
-    for (auto tspec_ptr = tspec_lower_bound; tspec_ptr != tspec_index.upper_bound(proposal_id); tspec_ptr++) {
-        eosio::check(_proposal_tspec_votes.count_positive(tspec_ptr->id) == 0, "proposal contains partly-approved technical specification applications");
-    }
-
-    _proposal_votes.erase_all(proposal_id);
-
-    for (auto tspec_ptr = tspec_lower_bound; tspec_ptr != tspec_index.upper_bound(proposal_id); ) {
-        del_tspec(*(tspec_ptr++));
-    }
+    eosio::check(tspec_index.find(proposal_id) == tspec_index.end(), "proposal has tspecs");
 
     _proposals.erase(proposal_ptr);
+    _proposal_votes.erase_all(proposal_id);
 }
 
 void worker::votepropos(proposal_id_t proposal_id, eosio::name voter, uint8_t positive) {
@@ -275,18 +263,14 @@ void worker::edittspec(tspec_id_t tspec_app_id, const tspec_data_t& tspec) {
 
 void worker::deltspec(tspec_id_t tspec_app_id)
 {
-    const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
-    const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
-    eosio::check(proposal.type == proposal_t::TYPE_TASK, "unsupported action");
-    eosio::check(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for deltspec");
-    eosio::check(_proposal_tspec_votes.count_positive(tspec_app_id) == 0, "upvoted technical specification application can be removed");
+    const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
+    const auto& proposal = _proposals.get(tspec_app.foreign_id);
+    eosio::check(tspec_app.state <= tspec_app_t::STATE_PAYMENT, "techspec already closed");
+    eosio::check(tspec_app.state < tspec_app_t::STATE_PAYMENT, "techspec paying, cannot delete");
 
     require_app_member(tspec_app.author);
 
-    eosio::check(_proposal_tspec_votes.count_positive(tspec_app.foreign_id) == 0,
-                 "technical specification application can't be deleted because it already has been upvoted"); //Technical Specification 1.e
-
-    del_tspec(tspec_app);
+    close_tspec(tspec_app.author, tspec_app, tspec_app_t::STATE_CLOSED_BY_AUTHOR, proposal);
 }
 
 void worker::approvetspec(tspec_id_t tspec_app_id, eosio::name author) {
@@ -359,12 +343,13 @@ void worker::cancelwork(tspec_id_t tspec_app_id, eosio::name initiator) {
         require_auth(tspec_app.author);
     }
 
+    // TODO: cancelwork fixed in #51
     _proposal_tspecs.modify(tspec_app, initiator, [&](auto& tspec) {
         refund(tspec, initiator);
     });
 
     auto proposal_ptr = get_proposal(tspec_app.foreign_id);
-    close_tspec(initiator, tspec_app, tspec_app_t::STATE_CLOSED, *proposal_ptr);
+    close_tspec(initiator, tspec_app, tspec_app_t::STATE_CLOSED_BY_WITNESSES, *proposal_ptr);
 }
 
 void worker::acceptwork(tspec_id_t tspec_app_id, comment_id_t comment_id) {
@@ -409,7 +394,7 @@ void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t s
             //TODO: check that all voters are delegates in this moment
             LOG("work has been rejected by the delegates voting, got % negative votes", negative_votes_count);
 
-            close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED, proposal);
+            close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
         }
     } else if (static_cast<tspec_app_t::review_status_t>(status) == tspec_app_t::STATUS_ACCEPT) {
         eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW, "invalid state for positive review");

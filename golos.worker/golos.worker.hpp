@@ -73,6 +73,11 @@ public:
             });
         }
 
+        bool empty(uint64_t foreign_id) const {
+            auto index = votes.template get_index<"foreign"_n>();
+            return index.find(foreign_id) == index.end();
+        }
+
         void vote(const vote_t &vote) {
             auto index = votes.template get_index<"foreign"_n>();
             for (auto vote_ptr = index.lower_bound(vote.foreign_id); vote_ptr != index.upper_bound(vote.foreign_id); vote_ptr++) {
@@ -114,6 +119,7 @@ public:
     template <eosio::name::raw TableName>
     struct approve_module_t: protected voting_module_t<TableName> {
         using voting_module_t<TableName>::count_positive;
+        using voting_module_t<TableName>::empty;
         using voting_module_t<TableName>::erase_all;
 
         approve_module_t(const eosio::name& code, uint64_t scope): voting_module_t<TableName>::voting_module_t(code, scope) {}
@@ -184,7 +190,8 @@ public:
             STATE_DELEGATES_REVIEW,
             STATE_PAYMENT,
             STATE_PAYMENT_COMPLETE,
-            STATE_CLOSED
+            STATE_CLOSED_BY_AUTHOR,
+            STATE_CLOSED_BY_WITNESSES
         };
 
         enum review_status_t {
@@ -276,7 +283,6 @@ protected:
     void pay_tspec_author(tspec_app_t& tspec_app);
     void refund(tspec_app_t& tspec_app, eosio::name modifier);
     void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal);
-    void del_tspec(const tspec_app_t &tspec_app);
 public:
     worker(eosio::name receiver, eosio::name code, eosio::datastream<const char *> ds) : contract(receiver, code, ds),
         _state(_self, _self.value),
