@@ -389,16 +389,21 @@ void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t s
 
     if (static_cast<tspec_app_t::review_status_t>(status) == tspec_app_t::STATUS_REJECT) {
         eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW ||
-                     tspec.state == tspec_app_t::STATE_WORK,
+                     tspec.state == tspec_app_t::STATE_WORK ||
+                     tspec.state == tspec_app_t::STATE_PAYMENT,
                      "invalid state for negative review");
 
         size_t negative_votes_count = _tspec_review_votes.count_negative(tspec_app_id);
         if (negative_votes_count >= config::witness_count_75)
         {
             //TODO: check that all voters are delegates in this moment
-            LOG("work has been rejected by the delegates voting, got % negative votes", negative_votes_count);
+            LOG("work has been rejected by the delegates voting, got % negative votes", negative_votes_count);;;
 
-            close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
+            if (tspec.state == tspec_app_t::STATE_PAYMENT) {
+                close_tspec(reviewer, tspec, tspec_app_t::STATE_DISAPPROVED_BY_WITNESSES, proposal);
+            } else {
+                close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
+            }
         }
     } else if (static_cast<tspec_app_t::review_status_t>(status) == tspec_app_t::STATUS_ACCEPT) {
         eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW, "invalid state for positive review");

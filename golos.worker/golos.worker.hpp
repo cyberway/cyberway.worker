@@ -196,7 +196,8 @@ public:
             STATE_PAYMENT,
             STATE_PAYMENT_COMPLETE,
             STATE_CLOSED_BY_AUTHOR,
-            STATE_CLOSED_BY_WITNESSES
+            STATE_CLOSED_BY_WITNESSES,
+            STATE_DISAPPROVED_BY_WITNESSES
         };
 
         enum review_status_t {
