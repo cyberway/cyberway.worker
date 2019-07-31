@@ -24,7 +24,7 @@
                     "type": "tspec_id_t"
                 },
                 {
-                    "name": "comment",
+                    "name": "comment_id",
                     "type": "comment_id_t"
                 }
             ]
@@ -34,16 +34,16 @@
             "base": "",
             "fields": [
                 {
-                    "name": "parent_id",
-                    "type": "comment_id_t"
-                },
-                {
                     "name": "comment_id",
                     "type": "comment_id_t"
                 },
                 {
                     "name": "author",
                     "type": "name"
+                },
+                {
+                    "name": "parent_id",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "text",
@@ -64,7 +64,7 @@
                     "type": "name"
                 },
                 {
-                    "name": "comment",
+                    "name": "comment_id",
                     "type": "comment_id_t"
                 }
             ]
@@ -82,7 +82,7 @@
                     "type": "name"
                 },
                 {
-                    "name": "comment",
+                    "name": "comment_id",
                     "type": "comment_id_t"
                 },
                 {
@@ -90,20 +90,8 @@
                     "type": "name"
                 },
                 {
-                    "name": "title",
-                    "type": "string"
-                },
-                {
-                    "name": "description",
-                    "type": "string"
-                },
-                {
                     "name": "tspec",
                     "type": "tspec_data_t"
-                },
-                {
-                    "name": "tspec_text",
-                    "type": "string"
                 }
             ]
         },
@@ -124,7 +112,7 @@
                     "type": "proposal_id_t"
                 },
                 {
-                    "name": "comment",
+                    "name": "comment_id",
                     "type": "comment_id_t"
                 },
                 {
@@ -308,7 +296,7 @@
                     "type": "name"
                 },
                 {
-                    "name": "comment",
+                    "name": "comment_id",
                     "type": "comment_id_t"
                 },
                 {
@@ -396,7 +384,7 @@
                     "type": "name"
                 },
                 {
-                    "name": "comment",
+                    "name": "comment_id",
                     "type": "comment_id_t"
                 },
                 {
@@ -424,7 +412,7 @@
                     "type": "uint64"
                 },
                 {
-                    "name": "result_comment",
+                    "name": "result_comment_id",
                     "type": "comment_id_t"
                 },
                 {

@@ -41,6 +41,10 @@ struct golos_worker_api: base_contract_api {
         return _tester->get_chaindb_struct(_code, scope, N(proposalsc), id, "comment_t");
     }
 
+    fc::variant get_comment(uint64_t id) {
+        return _tester->get_chaindb_struct(_code, _code, N(comments), id, "comment_t");
+    }
+
     fc::variant get_fund(const name& scope, const name& fund_name) {
         return _tester->get_chaindb_struct(_code, scope, N(funds), fund_name, "fund_t");
     }
@@ -55,6 +59,10 @@ struct golos_worker_api: base_contract_api {
 
     std::vector<variant> get_proposal_comments(const uint64_t scope) {
         return _tester->get_all_chaindb_rows(_code, scope, N(proposalsc), false);
+    }
+
+    std::vector<variant> get_comments() {
+        return _tester->get_all_chaindb_rows(_code, _code, N(comments), false);
     }
 
     std::vector<variant> get_proposal_votes(const uint64_t scope) {
