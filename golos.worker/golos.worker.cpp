@@ -3,7 +3,7 @@
 #define CHECK_POST(ID, AUTHOR) { \
     auto post = _comments.find(ID); \
     eosio::check(post != _comments.end(), "comment not exists"); \
-    eosio::check(post->parent_id == COMMENT_ROOT, "comment is not root"); \
+    eosio::check(!post->parent_id, "comment is not root"); \
     eosio::check(post->author == AUTHOR, "comment not your"); \
 }
 
@@ -45,7 +45,6 @@ void worker::deposit(tspec_app_t& tspec_app) {
 
 void worker::choose_proposal_tspec(proposal_t& proposal, const tspec_app_t& tspec_app) {
     eosio::check(proposal.type == proposal_t::TYPE_TASK, "invalid state for choose_proposal_tspec");
-    proposal.tspec_id = tspec_app.id;
     proposal.set_state(proposal_t::STATE_TSPEC_CHOSE);
 }
 
@@ -77,21 +76,20 @@ void worker::refund(tspec_app_t& tspec_app, eosio::name modifier) {
 }
 
 void worker::close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal) {
-    if (state == tspec_app_t::STATE_CLOSED && proposal.state > proposal_t::STATE_TSPEC_APP) {
+    if (state != tspec_app_t::STATE_PAYMENT_COMPLETE && proposal.state > proposal_t::STATE_TSPEC_APP) {
         _proposals.modify(proposal, payer, [&](proposal_t& proposal) {
             proposal.set_state(proposal_t::STATE_TSPEC_APP);
-            // TODO: clear tspec_id
         });
     }
     _proposal_tspecs.modify(tspec_app, payer, [&](tspec_app_t& tspec) {
         tspec.set_state(state);
         refund(tspec, payer);
     });
-}
-
-void worker::del_tspec(const tspec_app_t& tspec_app) {
-    _proposal_tspec_votes.erase_all(tspec_app.id);
-    _proposal_tspecs.erase(tspec_app);
+    // TODO: do instead of modify
+    if (state == tspec_app_t::STATE_CLOSED_BY_AUTHOR
+            && _proposal_tspec_votes.empty(tspec_app.id) && _tspec_review_votes.empty(tspec_app.id)) {
+        _proposal_tspecs.erase(tspec_app);
+    }
 }
 
 void worker::createpool(eosio::symbol token_symbol) {
@@ -132,8 +130,6 @@ void worker::addproposdn(proposal_id_t proposal_id, const eosio::name& author, c
         o.type = proposal_t::TYPE_DONE;
         o.author = author;
         o.comment_id = comment_id;
-        o.tspec_id = tspec_id;
-
         o.state = (uint8_t)proposal_t::STATE_TSPEC_CHOSE;
         o.created = TIMESTAMP_NOW;
         o.modified = TIMESTAMP_UNDEFINED;
@@ -169,25 +165,13 @@ void worker::editpropos(proposal_id_t proposal_id) // TODO: changing type
 
 void worker::delpropos(proposal_id_t proposal_id) {
     auto proposal_ptr = get_proposal(proposal_id);
-    eosio::check(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for delpropos");
-    eosio::check(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
     require_app_member(proposal_ptr->author);
 
     auto tspec_index = _proposal_tspecs.get_index<"foreign"_n>();
-    auto tspec_lower_bound = tspec_index.lower_bound(proposal_id);
-
-
-    for (auto tspec_ptr = tspec_lower_bound; tspec_ptr != tspec_index.upper_bound(proposal_id); tspec_ptr++) {
-        eosio::check(_proposal_tspec_votes.count_positive(tspec_ptr->id) == 0, "proposal contains partly-approved technical specification applications");
-    }
-
-    _proposal_votes.erase_all(proposal_id);
-
-    for (auto tspec_ptr = tspec_lower_bound; tspec_ptr != tspec_index.upper_bound(proposal_id); ) {
-        del_tspec(*(tspec_ptr++));
-    }
+    eosio::check(tspec_index.find(proposal_id) == tspec_index.end(), "proposal has tspecs");
 
     _proposals.erase(proposal_ptr);
+    _proposal_votes.erase_all(proposal_id);
 }
 
 void worker::votepropos(proposal_id_t proposal_id, eosio::name voter, uint8_t positive) {
@@ -204,11 +188,11 @@ void worker::votepropos(proposal_id_t proposal_id, eosio::name voter, uint8_t po
     _proposal_votes.vote(vote);
 }
 
-void worker::addcomment(comment_id_t comment_id, eosio::name author, comment_id_t parent_id, const string& text) {
+void worker::addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& text) {
     require_auth(author);
     eosio::check(!text.empty(), "comment cannot be empty");
-    eosio::check(comment_id != COMMENT_ROOT && _comments.find(comment_id) == _comments.end(), "comment exists");
-    eosio::check(parent_id == COMMENT_ROOT || _comments.find(parent_id) != _comments.end(), "parent comment not exists");
+    eosio::check(_comments.find(comment_id) == _comments.end(), "comment exists");
+    eosio::check(!parent_id || _comments.find(*parent_id) != _comments.end(), "parent comment not exists");
     _comments.emplace(author, [&](auto &obj) {
         obj.id = comment_id;
         obj.author = author;
@@ -227,8 +211,16 @@ void worker::delcomment(comment_id_t comment_id) {
     require_auth(comment.author);
 
     auto index = _comments.get_index<name("parent")>();
-    auto ptr = index.lower_bound(comment_id);
-    eosio::check(ptr == index.end(), "cannot delete comment with child comments");
+    eosio::check(index.find(comment_id) == index.end(), "comment has child comments");
+
+    auto prop_idx = _proposals.get_index<name("comment")>();
+    eosio::check(prop_idx.find(comment_id) == prop_idx.end(), "comment has proposal");
+
+    auto tspec_idx = _proposal_tspecs.get_index<name("comment")>();
+    eosio::check(tspec_idx.find(comment_id) == tspec_idx.end(), "comment has tspec");
+
+    auto tspec_res_idx = _proposal_tspecs.get_index<name("resultc")>();
+    eosio::check(tspec_res_idx.find(comment_id) == tspec_res_idx.end(), "comment used as result for tspec");
 
     _comments.erase(comment);
 }
@@ -275,18 +267,14 @@ void worker::edittspec(tspec_id_t tspec_app_id, const tspec_data_t& tspec) {
 
 void worker::deltspec(tspec_id_t tspec_app_id)
 {
-    const tspec_app_t &tspec_app = _proposal_tspecs.get(tspec_app_id);
-    const proposal_t &proposal = _proposals.get(tspec_app.foreign_id);
-    eosio::check(proposal.type == proposal_t::TYPE_TASK, "unsupported action");
-    eosio::check(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for deltspec");
-    eosio::check(_proposal_tspec_votes.count_positive(tspec_app_id) == 0, "upvoted technical specification application can be removed");
+    const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
+    const auto& proposal = _proposals.get(tspec_app.foreign_id);
+    eosio::check(tspec_app.state <= tspec_app_t::STATE_PAYMENT, "techspec already closed");
+    eosio::check(tspec_app.state < tspec_app_t::STATE_PAYMENT, "techspec paying, cannot delete");
 
     require_app_member(tspec_app.author);
 
-    eosio::check(_proposal_tspec_votes.count_positive(tspec_app.foreign_id) == 0,
-                 "technical specification application can't be deleted because it already has been upvoted"); //Technical Specification 1.e
-
-    del_tspec(tspec_app);
+    close_tspec(tspec_app.author, tspec_app, tspec_app_t::STATE_CLOSED_BY_AUTHOR, proposal);
 }
 
 void worker::approvetspec(tspec_id_t tspec_app_id, eosio::name author) {
@@ -359,12 +347,13 @@ void worker::cancelwork(tspec_id_t tspec_app_id, eosio::name initiator) {
         require_auth(tspec_app.author);
     }
 
+    // TODO: cancelwork fixed in #51
     _proposal_tspecs.modify(tspec_app, initiator, [&](auto& tspec) {
         refund(tspec, initiator);
     });
 
     auto proposal_ptr = get_proposal(tspec_app.foreign_id);
-    close_tspec(initiator, tspec_app, tspec_app_t::STATE_CLOSED, *proposal_ptr);
+    close_tspec(initiator, tspec_app, tspec_app_t::STATE_CLOSED_BY_WITNESSES, *proposal_ptr);
 }
 
 void worker::acceptwork(tspec_id_t tspec_app_id, comment_id_t comment_id) {
@@ -409,7 +398,7 @@ void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t s
             //TODO: check that all voters are delegates in this moment
             LOG("work has been rejected by the delegates voting, got % negative votes", negative_votes_count);
 
-            close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED, proposal);
+            close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
         }
     } else if (static_cast<tspec_app_t::review_status_t>(status) == tspec_app_t::STATUS_ACCEPT) {
         eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW, "invalid state for positive review");
