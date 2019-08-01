@@ -30,7 +30,6 @@ const asset app_fund_supply = asset::from_string("100.000 APP");
 const asset initial_user_supply = asset::from_string("10.000 APP");
 const asset tspec_deposit = asset::from_string("10.000 APP");
 
-#define COMMENT_ROOT 0
 constexpr const char *long_text = "Lorem ipsum dolor sit amet, amet sint accusam sit te, te perfecto sadipscing vix, eam labore volumus dissentias ne. Est nonumy numquam fierent te. Te pri saperet disputando delicatissimi, pri semper ornatus ad. Paulo convenire argumentum cum te, te vix meis idque, odio tempor nostrum ius ad. Cu doctus mediocrem petentium his, eum sale errem timeam ne. Ludus debitis id qui, vix mucius antiopam ad. Facer signiferumque vis no, sale eruditi expetenda id ius.";
 constexpr size_t delegates_count = 21;
 constexpr size_t delegates_51 = delegates_count / 2 + 1;
@@ -110,7 +109,6 @@ public:
         ASSERT_SUCCESS(worker.push_action(proposal_author, N(addcomment), mvo()
             ("comment_id", comment_id)
             ("author", proposal_author)
-            ("parent_id", COMMENT_ROOT)
             ("text", long_text)));
         ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
             ("proposal_id", proposal_id)
@@ -127,7 +125,6 @@ public:
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
             ("comment_id", comment_id)
             ("author", tspec_author)
-            ("parent_id", COMMENT_ROOT)
             ("text", "Technical specification #1")));
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addtspec), mvo()
             ("tspec_app_id", tspec_app_id)
@@ -148,7 +145,6 @@ public:
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
             ("comment_id", comment_id)
             ("author", tspec_author)
-            ("parent_id", COMMENT_ROOT)
             ("text", "Technical specification #2")));
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addtspec), mvo()
             ("tspec_app_id", other_tspec_app_id)
@@ -268,37 +264,34 @@ try
 {
     BOOST_TEST_MESSAGE("Testing: comment_CUD");
 
-    uint64_t comment_id = 1;
+    uint64_t comment_id = 0;
     auto comment_author = members[comment_id];
 
     BOOST_TEST_MESSAGE("-- Adding root post");
 
-    // ensure fail when adding comment with id = O
+    // ensure fail when adding comment below not-exist root comment
     BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(addcomment), mvo()
-        ("comment_id", COMMENT_ROOT)
+        ("comment_id", comment_id)
         ("author", comment_author)
-        ("parent_id", COMMENT_ROOT)
-        ("text", "Wrong id")), wasm_assert_msg("comment exists"));
+        ("parent_id", 100500)
+        ("text", "Fake parent id")), wasm_assert_msg("parent comment not exists"));
 
     // ensure fail when adding comment with empty text
     BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(addcomment), mvo()
         ("comment_id", comment_id)
         ("author", comment_author)
-        ("parent_id", COMMENT_ROOT)
         ("text", "")), wasm_assert_msg("comment cannot be empty"));
 
     // normal case
     ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
         ("comment_id", comment_id)
         ("author", comment_author)
-        ("parent_id", COMMENT_ROOT)
         ("text", "Root post")));
 
     // ensure fail when adding comment with same id
     BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(addcomment), mvo()
         ("comment_id", comment_id)
         ("author", comment_author)
-        ("parent_id", COMMENT_ROOT)
         ("text", "Duplicate comment")), wasm_assert_msg("comment exists"));
 
     BOOST_REQUIRE_EQUAL(worker.get_comment(comment_id)["author"], comment_author.to_string());
@@ -316,7 +309,7 @@ try
 
     constexpr uint64_t comments_count = 10;
 
-    for (comment_id = 2; comment_id <= comments_count+1; comment_id++) {
+    for (comment_id = 1; comment_id <= comments_count; comment_id++) {
         comment_author = members[comment_id];
 
         ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
@@ -331,12 +324,12 @@ try
 
     BOOST_TEST_MESSAGE("-- Deleting child comments");
 
-    for (comment_id = comments_count+1; comment_id >= 2; comment_id--) {
+    for (comment_id = comments_count; comment_id >= 1; comment_id--) {
         const name& comment_author = members[comment_id];
 
         // ensure fail when deleting comment with child
         BOOST_REQUIRE_EQUAL(worker.push_action(members[comment_id-1], N(delcomment), mvo()
-            ("comment_id", comment_id-1)), wasm_assert_msg("cannot delete comment with child comments"));
+            ("comment_id", comment_id-1)), wasm_assert_msg("comment has child comments"));
 
         ASSERT_SUCCESS(worker.push_action(comment_author, N(delcomment), mvo()
             ("comment_id", comment_id)));
@@ -358,7 +351,7 @@ try
 
     BOOST_TEST_MESSAGE("-- Deleting root post");
 
-    comment_id = 1;
+    comment_id = 0;
     comment_author = members[comment_id];
 
     ASSERT_SUCCESS(worker.push_action(comment_author, N(delcomment), mvo()
@@ -381,7 +374,6 @@ try
     ASSERT_SUCCESS(worker.push_action(members[0], N(addcomment), mvo()
         ("comment_id", 1)
         ("author", members[0])
-        ("parent_id", COMMENT_ROOT)
         ("text", "Proposal #1")));
     ASSERT_SUCCESS(worker.push_action(members[0], N(addpropos), mvo()
         ("proposal_id", proposal_id)
@@ -461,7 +453,6 @@ try
         ASSERT_SUCCESS(worker.push_action(proposal_author, N(addcomment), mvo()
             ("comment_id", proposal_id + 100)
             ("author", proposal_author)
-            ("parent_id", COMMENT_ROOT)
             ("text", "Proposal #1")));
         ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
             ("proposal_id", proposal_id)
@@ -477,7 +468,6 @@ try
             ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
                 ("comment_id", tspec_app_id + 200)
                 ("author", tspec_author)
-                ("parent_id", COMMENT_ROOT)
                 ("text", "Technical specification #1")));
             auto tspec_app = mvo()
                 ("proposal_id", proposal_id)
@@ -557,7 +547,6 @@ try
     ASSERT_SUCCESS(worker.push_action(proposal_author, N(addcomment), mvo()
         ("comment_id", proposal_post_id)
         ("author", proposal_author)
-        ("parent_id", COMMENT_ROOT)
         ("text", "Proposal #1")));
     ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
         ("proposal_id", proposal_id)
@@ -582,7 +571,6 @@ try
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
             ("comment_id", tspec_app_id + 2000)
             ("author", tspec_author)
-            ("parent_id", COMMENT_ROOT)
             ("text", "Awesome!")));
         auto tspec_app = mvo()
             ("proposal_id", proposal_id)
@@ -650,7 +638,6 @@ try
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
             ("comment_id", comment_id)
             ("author", tspec_author)
-            ("parent_id", COMMENT_ROOT)
             ("text", "Work done!")));
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(acceptwork), mvo()
             ("tspec_app_id", tspec_id)
@@ -693,7 +680,6 @@ try
     ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
         ("comment_id", proposal_id + 1)
         ("author", author_account)
-        ("parent_id", COMMENT_ROOT)
         ("text", "Sposnored proposal #1"))); // TODO: tspec should have separate post
     ASSERT_SUCCESS(worker.push_action(author_account, N(addproposdn), mvo()
         ("proposal_id", proposal_id)

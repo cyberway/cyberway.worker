@@ -43,7 +43,7 @@
                 },
                 {
                     "name": "parent_id",
-                    "type": "comment_id_t"
+                    "type": "uint64?"
                 },
                 {
                     "name": "text",
@@ -169,7 +169,7 @@
                 },
                 {
                     "name": "parent_id",
-                    "type": "comment_id_t"
+                    "type": "uint64?"
                 },
                 {
                     "name": "author",
@@ -308,10 +308,6 @@
                     "type": "uint8"
                 },
                 {
-                    "name": "tspec_id",
-                    "type": "tspec_id_t"
-                },
-                {
                     "name": "created",
                     "type": "uint64"
                 },
@@ -413,7 +409,7 @@
                 },
                 {
                     "name": "result_comment_id",
-                    "type": "comment_id_t"
+                    "type": "uint64?"
                 },
                 {
                     "name": "worker_payments_count",
@@ -609,6 +605,10 @@
                 "name": "primary",
                 "unique": true,
                 "orders": [{"field": "id", "order": "asc"}]
+            }, {
+                "name": "comment",
+                "unique": false,
+                "orders": [{"field": "comment_id", "order": "asc"}]
             }]
         },
         {
@@ -683,6 +683,14 @@
                 "name": "foreign",
                 "unique": false,
                 "orders": [{"field": "foreign_id", "order": "asc"}]
+            }, {
+                "name": "comment",
+                "unique": false,
+                "orders": [{"field": "comment_id", "order": "asc"}]
+            }, {
+                "name": "resultc",
+                "unique": false,
+                "orders": [{"field": "result_comment_id", "order": "asc"}]
             }]
         }
     ],

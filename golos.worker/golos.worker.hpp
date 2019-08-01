@@ -33,15 +33,18 @@ public:
     static constexpr uint32_t voting_time_s = 7 * 24 * 3600;
 
     using comment_id_t = uint64_t;
-    #define COMMENT_ROOT 0
     struct [[eosio::table]] comment_t {
         comment_id_t id;
-        comment_id_t parent_id;
+        std::optional<comment_id_t> parent_id;
         eosio::name author;
 
+        EOSLIB_SERIALIZE(comment_t, (id)(parent_id)(author))
+
         uint64_t primary_key() const { return id; }
-        uint64_t get_secondary_1() const { return parent_id; }
+        std::optional<comment_id_t> by_parent() const { return parent_id; }
     };
+    multi_index<"comments"_n, comment_t,
+        indexed_by<"parent"_n, const_mem_fun<comment_t, std::optional<comment_id_t>, &comment_t::by_parent>>> _comments;
 
     struct [[eosio::table]] vote_t {
         uint64_t id;
@@ -148,6 +151,8 @@ public:
         uint16_t payments_count;
         uint32_t payments_interval;
 
+        EOSLIB_SERIALIZE(tspec_data_t, (specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count)(payments_interval))
+
         void update(const tspec_data_t &that, bool limited) {
             bool modified = false;
 
@@ -209,11 +214,14 @@ public:
         asset deposit;
         eosio::name worker;
         uint64_t work_begining_time;
-        comment_id_t result_comment_id;
+        std::optional<comment_id_t> result_comment_id;
         uint8_t worker_payments_count;
         uint64_t payment_begining_time;
         uint64_t created;
         uint64_t modified;
+
+        EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(comment_id)(state)(data)(fund_name)(deposit)(worker)
+            (work_begining_time)(result_comment_id)(worker_payments_count)(payment_begining_time)(created)(modified))
 
         void modify(const tspec_data_t &that, bool limited = false) {
             data.update(that, limited);
@@ -222,10 +230,15 @@ public:
 
         uint64_t primary_key() const { return id; }
         uint64_t foreign_key() const { return foreign_id; }
+        comment_id_t by_comment() const { return comment_id; }
+        std::optional<comment_id_t> by_result() const { return result_comment_id; }
         void set_state(state_t new_state) { state = new_state; }
 
     };
-    multi_index<"tspecs"_n, tspec_app_t, indexed_by<"foreign"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>> _proposal_tspecs;
+    multi_index<"tspecs"_n, tspec_app_t,
+        indexed_by<"foreign"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>,
+        indexed_by<"comment"_n, const_mem_fun<tspec_app_t, comment_id_t, &tspec_app_t::by_comment>>,
+        indexed_by<"resultc"_n, const_mem_fun<tspec_app_t, std::optional<comment_id_t>, &tspec_app_t::by_result>>> _proposal_tspecs;
 
     using proposal_id_t = uint64_t;
     struct [[eosio::table]] proposal_t {
@@ -244,14 +257,15 @@ public:
         comment_id_t comment_id;
         uint8_t type;
         uint8_t state;
-        tspec_id_t tspec_id;
         uint64_t created;
         uint64_t modified;
 
         uint64_t primary_key() const { return id; }
+        comment_id_t by_comment() const { return comment_id; }
         void set_state(state_t new_state) { state = new_state; }
     };
-    multi_index<"proposals"_n, proposal_t> _proposals;
+    multi_index<"proposals"_n, proposal_t,
+        indexed_by<"comment"_n, const_mem_fun<proposal_t, comment_id_t, &proposal_t::by_comment>>> _proposals;
 
     struct [[eosio::table("state")]] state_t {
         eosio::symbol token_symbol;
@@ -265,8 +279,7 @@ public:
         uint64_t primary_key() const { return owner.value; }
     };
     multi_index<"funds"_n, fund_t> _funds;
-    multi_index<"comments"_n, comment_t,
-        indexed_by<"parent"_n, const_mem_fun<comment_t, uint64_t, &comment_t::get_secondary_1>>> _comments;
+
     voting_module_t<"proposalsv"_n> _proposal_votes;
     approve_module_t<"proposalstsv"_n> _proposal_tspec_votes;
     voting_module_t<"tspecrv"_n> _tspec_review_votes;
@@ -303,7 +316,7 @@ public:
     [[eosio::action]] void delpropos(proposal_id_t proposal_id);
     [[eosio::action]] void votepropos(proposal_id_t proposal_id, eosio::name voter, uint8_t positive);
 
-    [[eosio::action]] void addcomment(comment_id_t comment_id, eosio::name author, comment_id_t parent_id, const string& text);
+    [[eosio::action]] void addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& text);
     [[eosio::action]] void editcomment(comment_id_t comment_id, const string& text);
     [[eosio::action]] void delcomment(comment_id_t comment_id);
 

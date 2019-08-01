@@ -3,7 +3,7 @@
 #define CHECK_POST(ID, AUTHOR) { \
     auto post = _comments.find(ID); \
     eosio::check(post != _comments.end(), "comment not exists"); \
-    eosio::check(post->parent_id == COMMENT_ROOT, "comment is not root"); \
+    eosio::check(!post->parent_id, "comment is not root"); \
     eosio::check(post->author == AUTHOR, "comment not your"); \
 }
 
@@ -45,7 +45,6 @@ void worker::deposit(tspec_app_t& tspec_app) {
 
 void worker::choose_proposal_tspec(proposal_t& proposal, const tspec_app_t& tspec_app) {
     eosio::check(proposal.type == proposal_t::TYPE_TASK, "invalid state for choose_proposal_tspec");
-    proposal.tspec_id = tspec_app.id;
     proposal.set_state(proposal_t::STATE_TSPEC_CHOSE);
 }
 
@@ -80,7 +79,6 @@ void worker::close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::
     if (state != tspec_app_t::STATE_PAYMENT_COMPLETE && proposal.state > proposal_t::STATE_TSPEC_APP) {
         _proposals.modify(proposal, payer, [&](proposal_t& proposal) {
             proposal.set_state(proposal_t::STATE_TSPEC_APP);
-            // TODO: clear tspec_id
         });
     }
     _proposal_tspecs.modify(tspec_app, payer, [&](tspec_app_t& tspec) {
@@ -132,8 +130,6 @@ void worker::addproposdn(proposal_id_t proposal_id, const eosio::name& author, c
         o.type = proposal_t::TYPE_DONE;
         o.author = author;
         o.comment_id = comment_id;
-        o.tspec_id = tspec_id;
-
         o.state = (uint8_t)proposal_t::STATE_TSPEC_CHOSE;
         o.created = TIMESTAMP_NOW;
         o.modified = TIMESTAMP_UNDEFINED;
@@ -192,11 +188,11 @@ void worker::votepropos(proposal_id_t proposal_id, eosio::name voter, uint8_t po
     _proposal_votes.vote(vote);
 }
 
-void worker::addcomment(comment_id_t comment_id, eosio::name author, comment_id_t parent_id, const string& text) {
+void worker::addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& text) {
     require_auth(author);
     eosio::check(!text.empty(), "comment cannot be empty");
-    eosio::check(comment_id != COMMENT_ROOT && _comments.find(comment_id) == _comments.end(), "comment exists");
-    eosio::check(parent_id == COMMENT_ROOT || _comments.find(parent_id) != _comments.end(), "parent comment not exists");
+    eosio::check(_comments.find(comment_id) == _comments.end(), "comment exists");
+    eosio::check(!parent_id || _comments.find(*parent_id) != _comments.end(), "parent comment not exists");
     _comments.emplace(author, [&](auto &obj) {
         obj.id = comment_id;
         obj.author = author;
@@ -215,8 +211,16 @@ void worker::delcomment(comment_id_t comment_id) {
     require_auth(comment.author);
 
     auto index = _comments.get_index<name("parent")>();
-    auto ptr = index.lower_bound(comment_id);
-    eosio::check(ptr == index.end(), "cannot delete comment with child comments");
+    eosio::check(index.find(comment_id) == index.end(), "comment has child comments");
+
+    auto prop_idx = _proposals.get_index<name("comment")>();
+    eosio::check(prop_idx.find(comment_id) == prop_idx.end(), "comment has proposal");
+
+    auto tspec_idx = _proposal_tspecs.get_index<name("comment")>();
+    eosio::check(tspec_idx.find(comment_id) == tspec_idx.end(), "comment has tspec");
+
+    auto tspec_res_idx = _proposal_tspecs.get_index<name("resultc")>();
+    eosio::check(tspec_res_idx.find(comment_id) == tspec_res_idx.end(), "comment used as result for tspec");
 
     _comments.erase(comment);
 }
