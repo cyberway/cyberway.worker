@@ -142,7 +142,6 @@ public:
         }
     };
 
-    typedef uint64_t tspec_id_t;
     struct tspec_data_t {
         asset specification_cost;
         uint32_t specification_eta;
@@ -206,10 +205,9 @@ public:
             STATUS_ACCEPT = 1
         };
 
-        tspec_id_t id;
-        tspec_id_t foreign_id;
+        comment_id_t id;
+        comment_id_t foreign_id;
         eosio::name author;
-        comment_id_t comment_id;
         uint8_t state;
         tspec_data_t data;
         eosio::name fund_name;
@@ -222,7 +220,7 @@ public:
         uint64_t created;
         uint64_t modified;
 
-        EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(comment_id)(state)(data)(fund_name)(deposit)(worker)
+        EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(state)(data)(fund_name)(deposit)(worker)
             (work_begining_time)(result_comment_id)(worker_payments_count)(payment_begining_time)(created)(modified))
 
         void modify(const tspec_data_t &that, bool limited = false) {
@@ -232,17 +230,14 @@ public:
 
         uint64_t primary_key() const { return id; }
         uint64_t foreign_key() const { return foreign_id; }
-        comment_id_t by_comment() const { return comment_id; }
         std::optional<comment_id_t> by_result() const { return result_comment_id; }
         void set_state(state_t new_state) { state = new_state; }
 
     };
     multi_index<"tspecs"_n, tspec_app_t,
         indexed_by<"foreign"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>,
-        indexed_by<"comment"_n, const_mem_fun<tspec_app_t, comment_id_t, &tspec_app_t::by_comment>>,
         indexed_by<"resultc"_n, const_mem_fun<tspec_app_t, std::optional<comment_id_t>, &tspec_app_t::by_result>>> _proposal_tspecs;
 
-    using proposal_id_t = uint64_t;
     struct [[eosio::table]] proposal_t {
         enum state_t {
             STATE_TSPEC_APP = 1,
@@ -254,20 +249,17 @@ public:
             TYPE_DONE
         };
 
-        proposal_id_t id;
+        comment_id_t id;
         eosio::name author;
-        comment_id_t comment_id;
         uint8_t type;
         uint8_t state;
         uint64_t created;
         uint64_t modified;
 
         uint64_t primary_key() const { return id; }
-        comment_id_t by_comment() const { return comment_id; }
         void set_state(state_t new_state) { state = new_state; }
     };
-    multi_index<"proposals"_n, proposal_t,
-        indexed_by<"comment"_n, const_mem_fun<proposal_t, comment_id_t, &proposal_t::by_comment>>> _proposals;
+    multi_index<"proposals"_n, proposal_t> _proposals;
 
     struct [[eosio::table("state")]] state_t {
         eosio::symbol token_symbol;
@@ -287,7 +279,7 @@ public:
     voting_module_t<"tspecrv"_n> _tspec_review_votes;
 
     struct tspecstate_event {
-        tspec_id_t id;
+        comment_id_t id;
         uint8_t state;
     };
 
@@ -296,10 +288,10 @@ protected:
     void require_app_delegate(eosio::name account);
 
     auto get_state();
-    const auto get_proposal(proposal_id_t proposal_id);
+    const auto get_proposal(comment_id_t proposal_id);
 
     void deposit(tspec_app_t& tspec_app);
-    void choose_proposal_tspec(proposal_t & proposal, const tspec_app_t &tspec_app);
+    void choose_proposal_tspec(proposal_t& proposal, const tspec_app_t &tspec_app);
     void pay_tspec_author(tspec_app_t& tspec_app);
     void refund(tspec_app_t& tspec_app, eosio::name modifier);
     void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal);
@@ -318,28 +310,27 @@ public:
 
     [[eosio::action]] void createpool(eosio::symbol token_symbol);
 
-    [[eosio::action]] void addpropos(proposal_id_t proposal_id, const eosio::name& author, comment_id_t comment_id);
-    [[eosio::action]] void addproposdn(proposal_id_t proposal_id, const eosio::name& author, comment_id_t comment_id, const eosio::name& worker,
-        const tspec_data_t& tspec);
-    [[eosio::action]] void editpropos(proposal_id_t proposal_id);
-    [[eosio::action]] void delpropos(proposal_id_t proposal_id);
-    [[eosio::action]] void votepropos(proposal_id_t proposal_id, eosio::name voter, uint8_t positive);
+    [[eosio::action]] void addpropos(comment_id_t proposal_id, const eosio::name& author);
+    [[eosio::action]] void addproposdn(comment_id_t proposal_id, const eosio::name& author, const eosio::name& worker, const tspec_data_t& tspec);
+    [[eosio::action]] void editpropos(comment_id_t proposal_id);
+    [[eosio::action]] void delpropos(comment_id_t proposal_id);
+    [[eosio::action]] void votepropos(comment_id_t proposal_id, eosio::name voter, uint8_t positive);
 
     [[eosio::action]] void addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& text);
     [[eosio::action]] void editcomment(comment_id_t comment_id, const string& text);
     [[eosio::action]] void delcomment(comment_id_t comment_id);
 
-    [[eosio::action]] void addtspec(tspec_id_t tspec_app_id, eosio::name author, proposal_id_t proposal_id, comment_id_t comment_id, const tspec_data_t& tspec);
-    [[eosio::action]] void edittspec(tspec_id_t tspec_app_id, const tspec_data_t &tspec);
-    [[eosio::action]] void deltspec(tspec_id_t tspec_app_id);
-    [[eosio::action]] void approvetspec(tspec_id_t tspec_app_id, eosio::name author);
-    [[eosio::action]] void dapprovetspec(tspec_id_t tspec_app_id, eosio::name author);
-    [[eosio::action]] void startwork(tspec_id_t tspec_app_id, eosio::name worker);
-    [[eosio::action]] void cancelwork(tspec_id_t tspec_app_id, eosio::name initiator);
-    [[eosio::action]] void acceptwork(tspec_id_t tspec_app_id, comment_id_t comment_id);
-    [[eosio::action]] void unacceptwork(tspec_id_t tspec_app_id);
-    [[eosio::action]] void reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t status);
-    [[eosio::action]] void withdraw(tspec_id_t tspec_app_id);
+    [[eosio::action]] void addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t proposal_id, const tspec_data_t& tspec);
+    [[eosio::action]] void edittspec(comment_id_t tspec_id, const tspec_data_t &tspec);
+    [[eosio::action]] void deltspec(comment_id_t tspec_id);
+    [[eosio::action]] void approvetspec(comment_id_t tspec_id, eosio::name author);
+    [[eosio::action]] void dapprovetspec(comment_id_t tspec_id, eosio::name author);
+    [[eosio::action]] void startwork(comment_id_t tspec_id, eosio::name worker);
+    [[eosio::action]] void cancelwork(comment_id_t tspec_id, eosio::name initiator);
+    [[eosio::action]] void acceptwork(comment_id_t tspec_id, comment_id_t result_comment_id);
+    [[eosio::action]] void unacceptwork(comment_id_t tspec_id);
+    [[eosio::action]] void reviewwork(comment_id_t tspec_id, eosio::name reviewer, uint8_t status);
+    [[eosio::action]] void withdraw(comment_id_t tspec_id);
 
     void on_transfer(name from, name to, eosio::asset quantity, std::string memo);
 };

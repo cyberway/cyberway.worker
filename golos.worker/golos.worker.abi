@@ -4,14 +4,6 @@
         {
             "new_type_name": "comment_id_t",
             "type": "uint64"
-        },
-        {
-            "new_type_name": "proposal_id_t",
-            "type": "uint64"
-        },
-        {
-            "new_type_name": "tspec_id_t",
-            "type": "uint64"
         }
     ],
     "structs": [
@@ -20,11 +12,11 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 },
                 {
-                    "name": "comment_id",
+                    "name": "result_comment_id",
                     "type": "comment_id_t"
                 }
             ]
@@ -34,8 +26,8 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 }
             ]
         },
@@ -67,15 +59,11 @@
             "fields": [
                 {
                     "name": "proposal_id",
-                    "type": "proposal_id_t"
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "author",
                     "type": "name"
-                },
-                {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
                 }
             ]
         },
@@ -85,15 +73,11 @@
             "fields": [
                 {
                     "name": "proposal_id",
-                    "type": "proposal_id_t"
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "author",
                     "type": "name"
-                },
-                {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
                 },
                 {
                     "name": "worker",
@@ -110,8 +94,8 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "author",
@@ -119,10 +103,6 @@
                 },
                 {
                     "name": "proposal_id",
-                    "type": "proposal_id_t"
-                },
-                {
-                    "name": "comment_id",
                     "type": "comment_id_t"
                 },
                 {
@@ -136,8 +116,8 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "author",
@@ -150,22 +130,12 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "initiator",
                     "type": "name"
-                }
-            ]
-        },
-        {
-            "name": "comment_data_t",
-            "base": "",
-            "fields": [
-                {
-                    "name": "text",
-                    "type": "string"
                 }
             ]
         },
@@ -202,8 +172,8 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "author",
@@ -227,7 +197,7 @@
             "fields": [
                 {
                     "name": "proposal_id",
-                    "type": "proposal_id_t"
+                    "type": "comment_id_t"
                 }
             ]
         },
@@ -236,8 +206,8 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 }
             ]
         },
@@ -261,7 +231,7 @@
             "fields": [
                 {
                     "name": "proposal_id",
-                    "type": "proposal_id_t"
+                    "type": "comment_id_t"
                 }
             ]
         },
@@ -270,8 +240,8 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "tspec",
@@ -299,15 +269,11 @@
             "fields": [
                 {
                     "name": "id",
-                    "type": "proposal_id_t"
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "author",
                     "type": "name"
-                },
-                {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
                 },
                 {
                     "name": "type",
@@ -332,8 +298,8 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "reviewer",
@@ -350,8 +316,8 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "worker",
@@ -379,19 +345,15 @@
             "fields": [
                 {
                     "name": "id",
-                    "type": "tspec_id_t"
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "foreign_id",
-                    "type": "tspec_id_t"
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "author",
                     "type": "name"
-                },
-                {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
                 },
                 {
                     "name": "state",
@@ -497,7 +459,7 @@
             "fields": [
                 {
                     "name": "proposal_id",
-                    "type": "proposal_id_t"
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "voter",
@@ -514,8 +476,8 @@
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_app_id",
-                    "type": "tspec_id_t"
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
                 }
             ]
         },
@@ -525,7 +487,7 @@
             "fields": [
                 {
                     "name": "id",
-                    "type": "tspec_id_t"
+                    "type": "comment_id_t"
                 },
                 {
                     "name": "state",
@@ -623,7 +585,7 @@
         },
         {
             "name": "tspecerase",
-            "type": "tspec_id_t"
+            "type": "comment_id_t"
         }
     ],
     "tables": [
@@ -643,10 +605,6 @@
                 "name": "primary",
                 "unique": true,
                 "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "comment",
-                "unique": false,
-                "orders": [{"field": "comment_id", "order": "asc"}]
             }]
         },
         {
@@ -721,10 +679,6 @@
                 "name": "foreign",
                 "unique": false,
                 "orders": [{"field": "foreign_id", "order": "asc"}]
-            }, {
-                "name": "comment",
-                "unique": false,
-                "orders": [{"field": "comment_id", "order": "asc"}]
             }, {
                 "name": "resultc",
                 "unique": false,
