@@ -115,6 +115,8 @@ void worker::createpool(eosio::symbol token_symbol) {
 void worker::addpropos(comment_id_t proposal_id, const eosio::name& author) {
     require_app_member(author);
 
+    eosio::check(_proposals.find(proposal_id) == _proposals.end(), "already exists");
+
     CHECK_POST(proposal_id, author);
 
     _proposals.emplace(author, [&](auto &o) {
@@ -129,6 +131,8 @@ void worker::addpropos(comment_id_t proposal_id, const eosio::name& author) {
 
 void worker::addproposdn(comment_id_t proposal_id, const eosio::name& author, const eosio::name& worker, const tspec_data_t& tspec) {
     require_app_member(author);
+
+    eosio::check(_proposals.find(proposal_id) == _proposals.end(), "already exists");
 
     CHECK_POST(proposal_id, author);
 
@@ -232,6 +236,8 @@ void worker::addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t pr
     auto proposal_ptr = get_proposal(proposal_id);
     eosio::check(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
     eosio::check(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for addtspec");
+
+    eosio::check(_proposal_tspecs.find(tspec_id) == _proposal_tspecs.end(), "already exists");
 
     CHECK_POST(tspec_id, author);
 
