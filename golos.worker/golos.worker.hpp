@@ -192,11 +192,13 @@ public:
             STATE_CREATED = 1,
             STATE_APPROVED,
             STATE_WORK,
+            STATE_WIP,
             STATE_DELEGATES_REVIEW,
             STATE_PAYMENT,
             STATE_PAYMENT_COMPLETE,
             STATE_CLOSED_BY_AUTHOR,
-            STATE_CLOSED_BY_WITNESSES
+            STATE_CLOSED_BY_WITNESSES,
+            STATE_DISAPPROVED_BY_WITNESSES
         };
 
         enum review_status_t {
@@ -328,6 +330,7 @@ public:
     [[eosio::action]] void startwork(tspec_id_t tspec_app_id, eosio::name worker);
     [[eosio::action]] void cancelwork(tspec_id_t tspec_app_id, eosio::name initiator);
     [[eosio::action]] void acceptwork(tspec_id_t tspec_app_id, comment_id_t comment_id);
+    [[eosio::action]] void unacceptwork(tspec_id_t tspec_app_id);
     [[eosio::action]] void reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t status);
     [[eosio::action]] void withdraw(tspec_id_t tspec_app_id);
 

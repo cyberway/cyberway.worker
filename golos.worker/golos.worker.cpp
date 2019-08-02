@@ -336,7 +336,7 @@ void worker::startwork(tspec_id_t tspec_app_id, eosio::name worker) {
 
 void worker::cancelwork(tspec_id_t tspec_app_id, eosio::name initiator) {
     const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
-    eosio::check(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for cancelwork");
+    eosio::check(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state");
 
     if (initiator == tspec_app.worker)
     {
@@ -347,28 +347,34 @@ void worker::cancelwork(tspec_id_t tspec_app_id, eosio::name initiator) {
         require_auth(tspec_app.author);
     }
 
-    // TODO: cancelwork fixed in #51
     _proposal_tspecs.modify(tspec_app, initiator, [&](auto& tspec) {
-        refund(tspec, initiator);
+        tspec.set_state(tspec_app_t::STATE_APPROVED);
+        tspec.worker = name();
+        tspec.work_begining_time = TIMESTAMP_UNDEFINED;
     });
-
-    auto proposal_ptr = get_proposal(tspec_app.foreign_id);
-    close_tspec(initiator, tspec_app, tspec_app_t::STATE_CLOSED_BY_WITNESSES, *proposal_ptr);
 }
 
 void worker::acceptwork(tspec_id_t tspec_app_id, comment_id_t comment_id) {
     const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
     require_auth(tspec_app.author);
-    eosio::check(tspec_app.state == tspec_app_t::STATE_WORK, "invalid state for acceptwork");
-
-    auto proposal_ptr = get_proposal(tspec_app.foreign_id);
-    eosio::check(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
+    eosio::check(tspec_app.state == tspec_app_t::STATE_WORK || tspec_app.state == tspec_app_t::STATE_WIP, "invalid state");
 
     CHECK_POST(comment_id, tspec_app.author);
 
     _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](auto& tspec) {
         tspec.set_state(tspec_app_t::STATE_DELEGATES_REVIEW);
         tspec.result_comment_id = comment_id;
+    });
+}
+
+void worker::unacceptwork(tspec_id_t tspec_app_id) {
+    const auto& tspec_app = _proposal_tspecs.get(tspec_app_id);
+    require_auth(tspec_app.author);
+    eosio::check(tspec_app.state == tspec_app_t::STATE_DELEGATES_REVIEW, "invalid state");
+
+    _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](auto& tspec) {
+        tspec.set_state(tspec_app_t::STATE_WIP);
+        tspec.result_comment_id = 0;
     });
 }
 
@@ -389,7 +395,9 @@ void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t s
 
     if (static_cast<tspec_app_t::review_status_t>(status) == tspec_app_t::STATUS_REJECT) {
         eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW ||
-                     tspec.state == tspec_app_t::STATE_WORK,
+                     tspec.state == tspec_app_t::STATE_WORK ||
+                     tspec.state == tspec_app_t::STATE_WIP ||
+                     tspec.state == tspec_app_t::STATE_PAYMENT,
                      "invalid state for negative review");
 
         size_t negative_votes_count = _tspec_review_votes.count_negative(tspec_app_id);
@@ -398,7 +406,11 @@ void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t s
             //TODO: check that all voters are delegates in this moment
             LOG("work has been rejected by the delegates voting, got % negative votes", negative_votes_count);
 
-            close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
+            if (tspec.state == tspec_app_t::STATE_PAYMENT) {
+                close_tspec(reviewer, tspec, tspec_app_t::STATE_DISAPPROVED_BY_WITNESSES, proposal);
+            } else {
+                close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
+            }
         }
     } else if (static_cast<tspec_app_t::review_status_t>(status) == tspec_app_t::STATUS_ACCEPT) {
         eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW, "invalid state for positive review");
@@ -515,5 +527,5 @@ void worker::on_transfer(name from, name to, eosio::asset quantity, std::string 
 DISPATCH_WITH_TRANSFER(golos::worker, config::token_name, on_transfer, (createpool)
     (addproposdn)(addpropos)(editpropos)(delpropos)(votepropos)
     (addcomment)(editcomment)(delcomment)
-    (addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(acceptwork)(reviewwork)(cancelwork)(withdraw)
+    (addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(acceptwork)(unacceptwork)(reviewwork)(cancelwork)(withdraw)
 )

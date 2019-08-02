@@ -30,6 +30,16 @@
             ]
         },
         {
+            "name": "unacceptwork",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_app_id",
+                    "type": "tspec_id_t"
+                }
+            ]
+        },
+        {
             "name": "addcomment",
             "base": "",
             "fields": [
@@ -514,6 +524,10 @@
         {
             "name": "acceptwork",
             "type": "acceptwork"
+        },
+        {
+            "name": "unacceptwork",
+            "type": "unacceptwork"
         },
         {
             "name": "addcomment",

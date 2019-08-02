@@ -43,6 +43,7 @@ enum tspec_state_t {
     STATE_CREATED = 1,
     STATE_APPROVED,
     STATE_WORK,
+    STATE_WIP,
     STATE_DELEGATES_REVIEW,
     STATE_PAYMENT,
     STATE_PAYMENT_COMPLETE,
@@ -209,6 +210,7 @@ public:
             ("worker", worker_account)));
 
         BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_app_id), STATE_WORK);
+        BOOST_REQUIRE_EQUAL(worker.get_tspec(tspec_app_id)["worker"], worker_account.to_string());
     }
 
     abi_serializer abi_ser;
@@ -741,17 +743,11 @@ try
         ("tspec_app_id", tspec_id)
         ("initiator", worker_account)));
 
-    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED_BY_WITNESSES);
-    BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
+    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_APPROVED);
+    BOOST_REQUIRE_EQUAL(worker.get_tspec(tspec_id)["worker"], "");
 
-    BOOST_REQUIRE_EQUAL(worker.push_action(worker_account, N(withdraw), mvo()
-        ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
-
-    // if tspec is closed deposit should be refunded to the application fund
-    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply);
-
-    BOOST_REQUIRE_EQUAL(token.get_account(worker_account)["balance"], initial_user_supply.to_string());
-    BOOST_REQUIRE_EQUAL(token.get_account(tspec_author)["balance"], initial_user_supply.to_string());
+    // the application fund quantity should not change
+    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply - tspec_deposit);
 }
 FC_LOG_AND_RETHROW()
 
@@ -775,24 +771,18 @@ try
         ("tspec_app_id", tspec_id)
         ("initiator", tspec_author)));
 
-    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED_BY_WITNESSES);
-    BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
+    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_APPROVED);
+    BOOST_REQUIRE_EQUAL(worker.get_tspec(tspec_id)["worker"], "");
 
-    BOOST_REQUIRE_EQUAL(worker.push_action(worker_account, N(withdraw), mvo()
-        ("tspec_app_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
-
-    // if tspec is closed deposit should be refunded to the application fund
-    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply);
-
-    BOOST_REQUIRE_EQUAL(token.get_account(worker_account)["balance"], initial_user_supply.to_string());
-    BOOST_REQUIRE_EQUAL(token.get_account(tspec_author)["balance"], initial_user_supply.to_string());
+    // the application fund quantity should not change
+    BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply - tspec_deposit);
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(cancel_work_by_delegates, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(close_tspec_by_delegates, golos_worker_tester)
 try
 {
-    BOOST_TEST_MESSAGE("Testing: cancel_work_by_delegates");
+    BOOST_TEST_MESSAGE("Testing: close_tspec_by_delegates");
 
     uint64_t proposal_id = 0;
     uint64_t tspec_id = 0;
