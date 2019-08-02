@@ -286,6 +286,11 @@ public:
     approve_module_t<"proposalstsv"_n> _proposal_tspec_votes;
     voting_module_t<"tspecrv"_n> _tspec_review_votes;
 
+    struct tspecstate_event {
+        tspec_id_t id;
+        uint8_t state;
+    };
+
 protected:
     void require_app_member(eosio::name account);
     void require_app_delegate(eosio::name account);
@@ -298,6 +303,8 @@ protected:
     void pay_tspec_author(tspec_app_t& tspec_app);
     void refund(tspec_app_t& tspec_app, eosio::name modifier);
     void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal);
+    void send_tspecstate_event(const tspec_app_t& tspec_app, tspec_app_t::state_t state);
+    void send_tspecerase_event(const tspec_app_t& tspec_app);
 public:
     worker(eosio::name receiver, eosio::name code, eosio::datastream<const char *> ds) : contract(receiver, code, ds),
         _state(_self, _self.value),
