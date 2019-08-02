@@ -508,6 +508,20 @@
                     "type": "tspec_id_t"
                 }
             ]
+        },
+        {
+            "name": "tspecstate_event",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "tspec_id_t"
+                },
+                {
+                    "name": "state",
+                    "type": "uint8"
+                }
+            ]
         }
     ],
     "actions": [
@@ -586,6 +600,16 @@
         {
             "name": "withdraw",
             "type": "withdraw"
+        }
+    ],
+    "events": [
+        {
+            "name": "tspecstate",
+            "type": "tspecstate_event"
+        },
+        {
+            "name": "tspecerase",
+            "type": "tspec_id_t"
         }
     ],
     "tables": [

@@ -1,4 +1,5 @@
 #include "golos.worker.hpp"
+#include <eosio/event.hpp>
 
 #define CHECK_POST(ID, AUTHOR) { \
     auto post = _comments.find(ID); \
@@ -89,7 +90,18 @@ void worker::close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::
     if (state == tspec_app_t::STATE_CLOSED_BY_AUTHOR
             && _proposal_tspec_votes.empty(tspec_app.id) && _tspec_review_votes.empty(tspec_app.id)) {
         _proposal_tspecs.erase(tspec_app);
+        send_tspecerase_event(tspec_app);
+    } else {
+        send_tspecstate_event(tspec_app, state);
     }
+}
+
+void worker::send_tspecstate_event(const tspec_app_t& tspec_app, tspec_app_t::state_t state) {
+    eosio::event(_self, "tspecstate"_n, tspecstate_event{tspec_app.id, static_cast<uint8_t>(state)}).send();
+}
+
+void worker::send_tspecerase_event(const tspec_app_t& tspec_app) {
+    eosio::event(_self, "tspecerase"_n, tspec_app.id).send();
 }
 
 void worker::createpool(eosio::symbol token_symbol) {
@@ -294,7 +306,7 @@ void worker::approvetspec(tspec_id_t tspec_app_id, eosio::name author) {
     if (positive_votes_count >= config::witness_count_51)
     {
         //TODO: check that all voters are delegates in this moment
-        LOG("technical specification % got % positive votes", tspec_app_id, positive_votes_count);
+        send_tspecstate_event(tspec_app, tspec_app_t::STATE_APPROVED);
         _proposals.modify(proposal, author, [&](proposal_t &obj) {
             choose_proposal_tspec(obj, tspec_app);
         });
@@ -396,7 +408,7 @@ void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t s
         if (negative_votes_count >= config::witness_count_75)
         {
             //TODO: check that all voters are delegates in this moment
-            LOG("work has been rejected by the delegates voting, got % negative votes", negative_votes_count);
+            send_tspecstate_event(tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES);
 
             close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
         }
@@ -407,7 +419,7 @@ void worker::reviewwork(tspec_id_t tspec_app_id, eosio::name reviewer, uint8_t s
         if (positive_votes_count >= config::witness_count_51)
         {
             //TODO: check that all voters are delegates in this moment
-            LOG("work has been accepted by the delegates voting, got % positive votes", positive_votes_count);
+            send_tspecstate_event(tspec, tspec_app_t::STATE_PAYMENT);
 
             _proposal_tspecs.modify(tspec, reviewer, [&](auto& tspec) {
                 if (tspec.deposit.amount == 0 && proposal.type == proposal_t::TYPE_DONE) {
