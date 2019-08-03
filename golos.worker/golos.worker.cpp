@@ -2,13 +2,6 @@
 #include <eosio/event.hpp>
 #include <eosio/transaction.hpp>
 
-#define CHECK_POST(ID, AUTHOR) { \
-    auto post = _comments.find(ID); \
-    eosio::check(post != _comments.end(), "comment not exists"); \
-    eosio::check(!post->parent_id, "comment is not root"); \
-    eosio::check(post->author == AUTHOR, "comment not your"); \
-}
-
 namespace config = golos::config;
 
 namespace golos
@@ -75,7 +68,7 @@ void worker::close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::
     });
     // TODO: do instead of modify
     if (state == tspec_app_t::STATE_CLOSED_BY_AUTHOR
-            && _proposal_tspec_votes.empty(tspec_app.id) && _tspec_review_votes.empty(tspec_app.id)) {
+            && _tspec_votes.empty(tspec_app.id) && _tspec_review_votes.empty(tspec_app.id)) {
         _proposal_tspecs.erase(tspec_app);
         send_tspecerase_event(tspec_app);
     } else {
@@ -179,12 +172,7 @@ void worker::votepropos(comment_id_t proposal_id, eosio::name voter, uint8_t pos
     eosio::check(eosio::current_time_point().sec_since_epoch() <= proposal_ptr->created + voting_time_s, "voting time is over");
     require_app_member(voter);
 
-    vote_t vote{
-        .foreign_id = proposal_id,
-        .voter = voter,
-        .positive = positive != 0
-    };
-    _proposal_votes.vote(vote);
+    _proposal_votes.vote(proposal_id, voter, positive != 0);
 }
 
 void worker::addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& text) {
@@ -241,6 +229,7 @@ void worker::addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t pr
     _proposal_tspecs.emplace(author, [&](auto& o) {
         o.id = tspec_id;
         o.author = author;
+        o.set_state(tspec_app_t::STATE_CREATED);
         o.fund_name = _self;
         o.data = tspec;
         o.foreign_id = proposal_id;
@@ -288,49 +277,49 @@ void worker::deltspec(comment_id_t tspec_id)
     close_tspec(tspec_app.author, tspec_app, tspec_app_t::STATE_CLOSED_BY_AUTHOR, proposal);
 }
 
-void worker::approvetspec(comment_id_t tspec_id, eosio::name author) {
-    const auto& tspec_app = _proposal_tspecs.get(tspec_id);
-    const auto& proposal = _proposals.get(tspec_app.foreign_id);
+void worker::apprtspec(comment_id_t tspec_id, name approver) {
+    const auto& tspec = _proposal_tspecs.get(tspec_id);
+    CHECK_APPROVE_TSPEC(tspec, approver);
+    _tspec_votes.vote(tspec_id, approver, true);
 
-    eosio::check(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for approvetspec");
-    eosio::check(proposal.type == proposal_t::TYPE_TASK, "unsupported action");
-
-    require_app_delegate(author);
-    eosio::check(eosio::current_time_point().sec_since_epoch() <= tspec_app.created + voting_time_s, "approve time is over");
-
-    _proposal_tspec_votes.approve(tspec_id, author);
-
-    const size_t positive_votes_count = _proposal_tspec_votes.count_positive(tspec_id);
-    if (positive_votes_count >= config::witness_count_51)
-    {
-        //TODO: check that all voters are delegates in this moment
-        send_tspecstate_event(tspec_app, tspec_app_t::STATE_APPROVED);
-        _proposals.modify(proposal, author, [&](proposal_t &obj) {
-            choose_proposal_tspec(obj, tspec_app);
-        });
-        _proposal_tspecs.modify(tspec_app, author, [&](tspec_app_t& tspec) {
-            if (tspec.worker != name()) {
-                tspec.set_state(tspec_app_t::STATE_WORK);
-                tspec.work_begining_time = TIMESTAMP_NOW;
-            } else {
-                tspec.set_state(tspec_app_t::STATE_APPROVED);
-            }
-            deposit(tspec);
-        });
+    //TODO: check that all voters are delegates in this moment
+    if (_tspec_votes.count_positive(tspec_id) < config::witness_count_51) {
+    	return;
     }
+    const auto& proposal = _proposals.get(tspec.foreign_id);
+    _proposals.modify(proposal, approver, [&](auto& obj) {
+        choose_proposal_tspec(obj, tspec);
+    });
+    _proposal_tspecs.modify(tspec, approver, [&](auto& tspec) {
+        if (tspec.worker != name()) {
+            tspec.set_state(tspec_app_t::STATE_WORK);
+            tspec.work_begining_time = TIMESTAMP_NOW;
+        } else {
+            tspec.set_state(tspec_app_t::STATE_APPROVED);
+        }
+        deposit(tspec);
+    });
+    send_tspecstate_event(tspec, tspec_app_t::STATE_APPROVED);
 }
 
-void worker::dapprovetspec(comment_id_t tspec_id, eosio::name author) {
-    const auto& tspec_app = _proposal_tspecs.get(tspec_id);
-    const auto& proposal = _proposals.get(tspec_app.foreign_id);
+void worker::dapprtspec(comment_id_t tspec_id, name approver) {
+    const auto& tspec = _proposal_tspecs.get(tspec_id);
+    CHECK_APPROVE_TSPEC(tspec, approver);
+    _tspec_votes.vote(tspec_id, approver, false);
 
-    eosio::check(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state for dapprovetspec");
-    eosio::check(proposal.type == proposal_t::TYPE_TASK, "unsupported action");
+    //TODO: check that all voters are delegates in this moment
+    if (_tspec_votes.count_negative(tspec_id) < config::witness_count_75) {
+    	return;
+    }
+    const auto& proposal = _proposals.get(tspec.foreign_id);
+    close_tspec(approver, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
+    send_tspecstate_event(tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES);
+}
 
-    require_auth(author);
-    eosio::check(eosio::current_time_point().sec_since_epoch() <= tspec_app.created + voting_time_s, "approve time is over");
-
-    _proposal_tspec_votes.unapprove(tspec_id, author);
+void worker::unapprtspec(comment_id_t tspec_id, name approver) {
+    const auto& tspec = _proposal_tspecs.get(tspec_id);
+    CHECK_APPROVE_TSPEC(tspec, approver);
+    _tspec_votes.erase(tspec_id, approver);
 }
 
 void worker::startwork(comment_id_t tspec_id, name worker) {
@@ -399,13 +388,7 @@ void worker::reviewwork(comment_id_t tspec_id, eosio::name reviewer, uint8_t sta
 
     const auto& tspec = _proposal_tspecs.get(tspec_id);
 
-    vote_t vote {
-        .voter = reviewer,
-        .positive = status == tspec_app_t::STATUS_ACCEPT,
-        .foreign_id = tspec_id
-    };
-
-    _tspec_review_votes.vote(vote);
+    _tspec_review_votes.vote(tspec_id, reviewer, status == tspec_app_t::STATUS_ACCEPT);
 
     const auto& proposal = _proposals.get(tspec.foreign_id);
 
@@ -540,6 +523,6 @@ void worker::on_transfer(name from, name to, eosio::asset quantity, std::string 
 DISPATCH_WITH_TRANSFER(golos::worker, config::token_name, on_transfer, (createpool)
     (addproposdn)(addpropos)(editpropos)(delpropos)(votepropos)
     (addcomment)(editcomment)(delcomment)
-    (addtspec)(edittspec)(deltspec)(approvetspec)(dapprovetspec)(startwork)(acceptwork)(unacceptwork)(reviewwork)(cancelwork)
+    (addtspec)(edittspec)(deltspec)(apprtspec)(dapprtspec)(unapprtspec)(startwork)(acceptwork)(unacceptwork)(reviewwork)(cancelwork)
     (payout)
 )

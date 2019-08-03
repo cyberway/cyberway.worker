@@ -134,7 +134,7 @@
             ]
         },
         {
-            "name": "approvetspec",
+            "name": "apprtspec",
             "base": "",
             "fields": [
                 {
@@ -142,7 +142,7 @@
                     "type": "comment_id_t"
                 },
                 {
-                    "name": "author",
+                    "name": "approver",
                     "type": "name"
                 }
             ]
@@ -186,20 +186,6 @@
                 {
                     "name": "token_symbol",
                     "type": "symbol"
-                }
-            ]
-        },
-        {
-            "name": "dapprovetspec",
-            "base": "",
-            "fields": [
-                {
-                    "name": "tspec_id",
-                    "type": "comment_id_t"
-                },
-                {
-                    "name": "author",
-                    "type": "name"
                 }
             ]
         },
@@ -534,8 +520,16 @@
             "type": "edittspec"
         },
         {
-            "name": "approvetspec",
-            "type": "approvetspec"
+            "name": "apprtspec",
+            "type": "apprtspec"
+        },
+        {
+            "name": "dapprtspec",
+            "type": "apprtspec"
+        },
+        {
+            "name": "unapprtspec",
+            "type": "apprtspec"
         },
         {
             "name": "cancelwork",
@@ -544,10 +538,6 @@
         {
             "name": "createpool",
             "type": "createpool"
-        },
-        {
-            "name": "dapprovetspec",
-            "type": "dapprovetspec"
         },
         {
             "name": "delcomment",
@@ -629,19 +619,6 @@
             }]
         },
         {
-            "name": "proposalstsv",
-            "type": "vote_t",
-            "indexes": [{
-                "name": "primary",
-                "unique": true,
-                "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "foreign",
-                "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
-            }]
-        },
-        {
             "name": "proposalsv",
             "type": "vote_t",
             "indexes": [{
@@ -661,6 +638,19 @@
                 "name": "primary",
                 "unique": true,
                 "orders": [{"field": "id", "order": "asc"}]
+            }]
+        },
+        {
+            "name": "tspecv",
+            "type": "vote_t",
+            "indexes": [{
+                "name": "primary",
+                "unique": true,
+                "orders": [{"field": "id", "order": "asc"}]
+            }, {
+                "name": "foreign",
+                "unique": false,
+                "orders": [{"field": "foreign_id", "order": "asc"}]
             }]
         },
         {
