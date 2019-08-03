@@ -235,7 +235,7 @@ public:
     multi_index<"tspecs"_n, tspec_app_t,
         indexed_by<"foreign"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>,
         indexed_by<"resultc"_n, const_mem_fun<tspec_app_t, std::optional<comment_id_t>, &tspec_app_t::by_result>>,
-        indexed_by<"payout"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::by_payout>>> _proposal_tspecs;
+        indexed_by<"payout"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::by_payout>>> _tspecs;
 
     struct [[eosio::table]] proposal_t {
         enum state_t {
@@ -299,7 +299,7 @@ public:
         _comments(_self, _self.value),
         _proposal_votes(_self, _self.value),
         _tspec_review_votes(_self, _self.value),
-        _proposal_tspecs(_self, _self.value),
+        _tspecs(_self, _self.value),
         _tspec_votes(_self, _self.value) {}
 
     [[eosio::action]] void createpool(eosio::symbol token_symbol);
