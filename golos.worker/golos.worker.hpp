@@ -233,12 +233,14 @@ public:
         uint64_t primary_key() const { return id; }
         uint64_t foreign_key() const { return foreign_id; }
         std::optional<comment_id_t> by_result() const { return result_comment_id; }
+        uint64_t by_payout() const { return next_payout; }
         void set_state(state_t new_state) { state = new_state; }
 
     };
     multi_index<"tspecs"_n, tspec_app_t,
         indexed_by<"foreign"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>,
-        indexed_by<"resultc"_n, const_mem_fun<tspec_app_t, std::optional<comment_id_t>, &tspec_app_t::by_result>>> _proposal_tspecs;
+        indexed_by<"resultc"_n, const_mem_fun<tspec_app_t, std::optional<comment_id_t>, &tspec_app_t::by_result>>,
+        indexed_by<"payout"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::by_payout>>> _proposal_tspecs;
 
     struct [[eosio::table]] proposal_t {
         enum state_t {
@@ -331,7 +333,7 @@ public:
     [[eosio::action]] void acceptwork(comment_id_t tspec_id, comment_id_t result_comment_id);
     [[eosio::action]] void unacceptwork(comment_id_t tspec_id);
     [[eosio::action]] void reviewwork(comment_id_t tspec_id, eosio::name reviewer, uint8_t status);
-    [[eosio::action]] void withdraw(comment_id_t tspec_id);
+    [[eosio::action]] void payout(name ram_payer);
 
     void on_transfer(name from, name to, eosio::asset quantity, std::string memo);
 };
