@@ -49,20 +49,6 @@ void worker::choose_proposal_tspec(proposal_t& proposal, const tspec_app_t& tspe
     proposal.set_state(proposal_t::STATE_TSPEC_CHOSE);
 }
 
-void worker::pay_tspec_author(tspec_app_t& tspec_app) {
-    const auto& tspec = tspec_app.data;
-
-    tspec_app.deposit -= tspec.specification_cost;
-
-    action(permission_level{_self, "active"_n},
-           config::token_name,
-           "transfer"_n,
-           std::make_tuple(_self, tspec_app.author,
-                           tspec.specification_cost,
-                           std::string("technical specification reward")))
-            .send();
-}
-
 void worker::refund(tspec_app_t& tspec_app, eosio::name modifier) {
     if (tspec_app.deposit.amount == 0) {
         return;
@@ -456,7 +442,6 @@ void worker::reviewwork(comment_id_t tspec_id, eosio::name reviewer, uint8_t sta
                 }
 
                 tspec.set_state(tspec_app_t::STATE_PAYMENT); 
-                pay_tspec_author(tspec);
                 tspec.next_payout = TIMESTAMP_NOW + tspec.data.payments_interval;
             });
         }
@@ -478,12 +463,15 @@ void worker::withdraw(comment_id_t tspec_id) {
 
     eosio::check(tspec_app.next_payout <= TIMESTAMP_NOW, "can't withdraw right now");
 
-    auto quantity = tspec.development_cost / tspec.payments_count;
+    auto author_payment = tspec.specification_cost / tspec.payments_count;
+    auto dev_payment = tspec.development_cost / tspec.payments_count;
+
     if (tspec_app.worker_payments_count + 1 == tspec.payments_count) {
-        quantity += asset(tspec.development_cost.amount % tspec.payments_count, quantity.symbol);
+        author_payment += asset(tspec.specification_cost.amount % tspec.payments_count, author_payment.symbol);
+        dev_payment += asset(tspec.development_cost.amount % tspec.payments_count, dev_payment.symbol);
 
         _proposal_tspecs.modify(tspec_app, tspec_app.worker, [&](auto& t) {
-            t.deposit -= quantity;
+            t.deposit -= (author_payment + dev_payment);
             t.worker_payments_count += 1;
             t.next_payout = TIMESTAMP_MAX;
             t.set_state(tspec_app_t::STATE_PAYMENT_COMPLETE);
@@ -491,17 +479,21 @@ void worker::withdraw(comment_id_t tspec_id) {
         send_tspecstate_event(tspec_app, tspec_app_t::STATE_PAYMENT_COMPLETE);
     } else {
         _proposal_tspecs.modify(tspec_app, tspec_app.worker, [&](auto& t) {
-            t.deposit -= quantity;
+            t.deposit -= (author_payment + dev_payment);
             t.worker_payments_count += 1;
             t.next_payout += tspec.payments_interval;
         });
     }
 
-    action(permission_level{_self, "active"_n},
-           config::token_name, "transfer"_n,
-           std::make_tuple(_self, tspec_app.worker,
-                           quantity, std::string("worker reward")))
-            .send();
+    auto transfer = [&](const name& to, const asset& payment, const std::string& memo) {
+        action(
+            permission_level{_self, "active"_n},
+            config::token_name, "transfer"_n,
+            std::make_tuple(_self, to, payment, memo)
+        ).send();
+    };
+    transfer(tspec_app.author, author_payment, "tspec author reward");
+    transfer(tspec_app.worker, dev_payment, "worker reward");
 }
 
 void worker::on_transfer(name from, name to, eosio::asset quantity, std::string memo) {

@@ -294,7 +294,6 @@ protected:
 
     void deposit(tspec_app_t& tspec_app);
     void choose_proposal_tspec(proposal_t& proposal, const tspec_app_t &tspec_app);
-    void pay_tspec_author(tspec_app_t& tspec_app);
     void refund(tspec_app_t& tspec_app, eosio::name modifier);
     void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal);
     void send_tspecstate_event(const tspec_app_t& tspec_app, tspec_app_t::state_t state);
