@@ -396,7 +396,7 @@
                     "type": "uint8"
                 },
                 {
-                    "name": "payment_begining_time",
+                    "name": "next_payout",
                     "type": "uint64"
                 },
                 {

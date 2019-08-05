@@ -156,6 +156,7 @@ void worker::addproposdn(comment_id_t proposal_id, const eosio::name& author, co
         obj.worker = worker;
         obj.work_begining_time = TIMESTAMP_NOW;
         obj.worker_payments_count = 0;
+        obj.next_payout = TIMESTAMP_MAX;
         obj.created = TIMESTAMP_NOW;
         obj.modified = TIMESTAMP_UNDEFINED;
 
@@ -257,6 +258,7 @@ void worker::addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t pr
         o.data = tspec;
         o.foreign_id = proposal_id;
         o.worker = *worker;
+        o.next_payout = TIMESTAMP_MAX;
         o.created = TIMESTAMP_NOW;
         o.modified = TIMESTAMP_UNDEFINED;
     });
@@ -455,7 +457,7 @@ void worker::reviewwork(comment_id_t tspec_id, eosio::name reviewer, uint8_t sta
 
                 tspec.set_state(tspec_app_t::STATE_PAYMENT); 
                 pay_tspec_author(tspec);
-                tspec.payment_begining_time = TIMESTAMP_NOW;
+                tspec.next_payout = TIMESTAMP_NOW + tspec.data.payments_interval;
             });
         }
     } else {
@@ -474,40 +476,26 @@ void worker::withdraw(comment_id_t tspec_id) {
         static_cast<int>(tspec.payments_count),
         static_cast<int>(tspec.payments_interval));
 
-    asset quantity;
+    eosio::check(tspec_app.next_payout <= TIMESTAMP_NOW, "can't withdraw right now");
 
-    if (tspec.payments_count == 1)
-    {
-        quantity = tspec.development_cost;
+    auto quantity = tspec.development_cost / tspec.payments_count;
+    if (tspec_app.worker_payments_count + 1 == tspec.payments_count) {
+        quantity += asset(tspec.development_cost.amount % tspec.payments_count, quantity.symbol);
+
+        _proposal_tspecs.modify(tspec_app, tspec_app.worker, [&](auto& t) {
+            t.deposit -= quantity;
+            t.worker_payments_count += 1;
+            t.next_payout = TIMESTAMP_MAX;
+            t.set_state(tspec_app_t::STATE_PAYMENT_COMPLETE);
+        });
+        send_tspecstate_event(tspec_app, tspec_app_t::STATE_PAYMENT_COMPLETE);
+    } else {
+        _proposal_tspecs.modify(tspec_app, tspec_app.worker, [&](auto& t) {
+            t.deposit -= quantity;
+            t.worker_payments_count += 1;
+            t.next_payout += tspec.payments_interval;
+        });
     }
-    else
-    {
-        const uint32_t payment_epoch = (eosio::current_time_point().sec_since_epoch() - tspec_app.payment_begining_time)
-            / tspec.payments_interval;
-
-        LOG("payment epoch: %, interval: %s, worker payments: %",
-            payment_epoch, tspec.payments_interval,
-            int(tspec_app.worker_payments_count));
-
-        eosio::check(payment_epoch > tspec_app.worker_payments_count, "can't withdraw right now");
-
-        quantity = tspec.development_cost / tspec.payments_count;
-
-        if (tspec_app.worker_payments_count + 1 == tspec.payments_count)
-        {
-            quantity += asset(tspec.development_cost.amount % tspec.payments_count, quantity.symbol);
-        }
-    }
-
-    if (tspec_app.worker_payments_count+1 == tspec.payments_count) {
-        auto proposal_ptr = get_proposal(tspec_app.foreign_id);
-        close_tspec(tspec_app.worker, tspec_app, tspec_app_t::STATE_PAYMENT_COMPLETE, *proposal_ptr);
-    }
-
-    _proposal_tspecs.modify(tspec_app, tspec_app.worker, [&](auto& t) {
-        t.deposit -= quantity;
-        t.worker_payments_count += 1;
-    });
 
     action(permission_level{_self, "active"_n},
            config::token_name, "transfer"_n,

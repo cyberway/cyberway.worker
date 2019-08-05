@@ -22,6 +22,7 @@ using namespace std;
 #define ZERO_ASSET eosio::asset(0, get_state().token_symbol)
 #define TIMESTAMP_UNDEFINED 0
 #define TIMESTAMP_NOW eosio::current_time_point().sec_since_epoch()
+#define TIMESTAMP_MAX UINT32_MAX
 
 #define LOG(format, ...) print_f("%::%: " format "\n", _self.to_string().c_str(), __FUNCTION__, ##__VA_ARGS__);
 
@@ -216,12 +217,13 @@ public:
         uint64_t work_begining_time;
         std::optional<comment_id_t> result_comment_id;
         uint8_t worker_payments_count;
-        uint64_t payment_begining_time;
+        uint64_t next_payout;
         uint64_t created;
         uint64_t modified;
 
         EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(state)(data)(fund_name)(deposit)(worker)
-            (work_begining_time)(result_comment_id)(worker_payments_count)(payment_begining_time)(created)(modified))
+            (work_begining_time)(result_comment_id)(worker_payments_count)(next_payout)
+            (created)(modified))
 
         void modify(const tspec_data_t &that, bool limited = false) {
             data.update(that, limited);
