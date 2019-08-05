@@ -643,8 +643,8 @@ try
 
         BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT);
 
-        ASSERT_SUCCESS(worker.push_action(worker_account, N(withdraw), mvo()
-            ("tspec_id", tspec_id)));
+        ASSERT_SUCCESS(worker.push_action(worker_account, N(payout), mvo()
+            ("ram_payer", worker_account)));
 
         BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT_COMPLETE);
         BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
@@ -696,8 +696,8 @@ try
     BOOST_REQUIRE_EQUAL(worker.get_tspec_state(0), STATE_PAYMENT); // addproposdn uses available_primary_key
 
     for (int i = 0; i < payments_count; i++) {
-        ASSERT_SUCCESS(worker.push_action(worker_account, N(withdraw), mvo()
-            ("tspec_id", 0))); // addproposdn uses available_primary_key
+        ASSERT_SUCCESS(worker.push_action(worker_account, N(payout), mvo()
+            ("ram_payer", worker_account))); // addproposdn uses available_primary_key
     }
 
     BOOST_REQUIRE_EQUAL(worker.get_tspec_state(0), STATE_PAYMENT_COMPLETE); // addproposdn uses available_primary_key
@@ -790,9 +790,6 @@ try
 
     BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED_BY_WITNESSES);
     BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
-
-    BOOST_REQUIRE_EQUAL(worker.push_action(worker_account, N(withdraw), mvo()
-        ("tspec_id", tspec_id)), wasm_assert_msg("invalid state for withdraw"));
 
     // if tspec is closed deposit should be refunded to the application fund
     BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply);

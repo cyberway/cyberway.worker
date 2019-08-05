@@ -396,7 +396,7 @@
                     "type": "uint8"
                 },
                 {
-                    "name": "payment_begining_time",
+                    "name": "next_payout",
                     "type": "uint64"
                 },
                 {
@@ -480,12 +480,12 @@
             ]
         },
         {
-            "name": "withdraw",
+            "name": "payout",
             "base": "",
             "fields": [
                 {
-                    "name": "tspec_id",
-                    "type": "comment_id_t"
+                    "name": "ram_payer",
+                    "type": "name"
                 }
             ]
         },
@@ -582,8 +582,8 @@
             "type": "votepropos"
         },
         {
-            "name": "withdraw",
-            "type": "withdraw"
+            "name": "payout",
+            "type": "payout"
         }
     ],
     "events": [
@@ -691,6 +691,10 @@
                 "name": "resultc",
                 "unique": false,
                 "orders": [{"field": "result_comment_id", "order": "asc"}]
+            }, {
+                "name": "payout",
+                "unique": false,
+                "orders": [{"field": "next_payout", "order": "asc"}]
             }]
         }
     ],

@@ -22,6 +22,7 @@ using namespace std;
 #define ZERO_ASSET eosio::asset(0, get_state().token_symbol)
 #define TIMESTAMP_UNDEFINED 0
 #define TIMESTAMP_NOW eosio::current_time_point().sec_since_epoch()
+#define TIMESTAMP_MAX UINT32_MAX
 
 #define LOG(format, ...) print_f("%::%: " format "\n", _self.to_string().c_str(), __FUNCTION__, ##__VA_ARGS__);
 
@@ -216,12 +217,13 @@ public:
         uint64_t work_begining_time;
         std::optional<comment_id_t> result_comment_id;
         uint8_t worker_payments_count;
-        uint64_t payment_begining_time;
+        uint64_t next_payout;
         uint64_t created;
         uint64_t modified;
 
         EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(state)(data)(fund_name)(deposit)(worker)
-            (work_begining_time)(result_comment_id)(worker_payments_count)(payment_begining_time)(created)(modified))
+            (work_begining_time)(result_comment_id)(worker_payments_count)(next_payout)
+            (created)(modified))
 
         void modify(const tspec_data_t &that, bool limited = false) {
             data.update(that, limited);
@@ -231,12 +233,14 @@ public:
         uint64_t primary_key() const { return id; }
         uint64_t foreign_key() const { return foreign_id; }
         std::optional<comment_id_t> by_result() const { return result_comment_id; }
+        uint64_t by_payout() const { return next_payout; }
         void set_state(state_t new_state) { state = new_state; }
 
     };
     multi_index<"tspecs"_n, tspec_app_t,
         indexed_by<"foreign"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>,
-        indexed_by<"resultc"_n, const_mem_fun<tspec_app_t, std::optional<comment_id_t>, &tspec_app_t::by_result>>> _proposal_tspecs;
+        indexed_by<"resultc"_n, const_mem_fun<tspec_app_t, std::optional<comment_id_t>, &tspec_app_t::by_result>>,
+        indexed_by<"payout"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::by_payout>>> _proposal_tspecs;
 
     struct [[eosio::table]] proposal_t {
         enum state_t {
@@ -292,7 +296,6 @@ protected:
 
     void deposit(tspec_app_t& tspec_app);
     void choose_proposal_tspec(proposal_t& proposal, const tspec_app_t &tspec_app);
-    void pay_tspec_author(tspec_app_t& tspec_app);
     void refund(tspec_app_t& tspec_app, eosio::name modifier);
     void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal);
     void send_tspecstate_event(const tspec_app_t& tspec_app, tspec_app_t::state_t state);
@@ -330,7 +333,7 @@ public:
     [[eosio::action]] void acceptwork(comment_id_t tspec_id, comment_id_t result_comment_id);
     [[eosio::action]] void unacceptwork(comment_id_t tspec_id);
     [[eosio::action]] void reviewwork(comment_id_t tspec_id, eosio::name reviewer, uint8_t status);
-    [[eosio::action]] void withdraw(comment_id_t tspec_id);
+    [[eosio::action]] void payout(name ram_payer);
 
     void on_transfer(name from, name to, eosio::asset quantity, std::string memo);
 };
