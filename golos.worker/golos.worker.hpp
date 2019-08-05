@@ -320,12 +320,12 @@ public:
     [[eosio::action]] void editcomment(comment_id_t comment_id, const string& text);
     [[eosio::action]] void delcomment(comment_id_t comment_id);
 
-    [[eosio::action]] void addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t proposal_id, const tspec_data_t& tspec);
-    [[eosio::action]] void edittspec(comment_id_t tspec_id, const tspec_data_t &tspec);
+    [[eosio::action]] void addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t proposal_id, const tspec_data_t& tspec, std::optional<name> worker);
+    [[eosio::action]] void edittspec(comment_id_t tspec_id, const tspec_data_t &tspec, std::optional<name> worker);
     [[eosio::action]] void deltspec(comment_id_t tspec_id);
     [[eosio::action]] void approvetspec(comment_id_t tspec_id, eosio::name author);
     [[eosio::action]] void dapprovetspec(comment_id_t tspec_id, eosio::name author);
-    [[eosio::action]] void startwork(comment_id_t tspec_id, eosio::name worker);
+    [[eosio::action]] void startwork(comment_id_t tspec_id, name worker);
     [[eosio::action]] void cancelwork(comment_id_t tspec_id, eosio::name initiator);
     [[eosio::action]] void acceptwork(comment_id_t tspec_id, comment_id_t result_comment_id);
     [[eosio::action]] void unacceptwork(comment_id_t tspec_id);

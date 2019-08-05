@@ -232,7 +232,7 @@ void worker::delcomment(comment_id_t comment_id) {
     _comments.erase(comment);
 }
 
-void worker::addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t proposal_id, const tspec_data_t& tspec) {
+void worker::addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t proposal_id, const tspec_data_t& tspec, std::optional<name> worker) {
     auto proposal_ptr = get_proposal(proposal_id);
     eosio::check(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
     eosio::check(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for addtspec");
@@ -244,18 +244,25 @@ void worker::addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t pr
     eosio::check(get_state().token_symbol == tspec.specification_cost.symbol, "invalid symbol for the specification cost");
     eosio::check(get_state().token_symbol == tspec.development_cost.symbol, "invalid symbol for the development cost");
 
+    if (worker) {
+        eosio::check(is_account(*worker), "worker account not exists");
+    } else {
+        worker = name();
+    }
+
     _proposal_tspecs.emplace(author, [&](auto& o) {
         o.id = tspec_id;
         o.author = author;
         o.fund_name = _self;
         o.data = tspec;
         o.foreign_id = proposal_id;
+        o.worker = *worker;
         o.created = TIMESTAMP_NOW;
         o.modified = TIMESTAMP_UNDEFINED;
     });
 }
 
-void worker::edittspec(comment_id_t tspec_id, const tspec_data_t& tspec) {
+void worker::edittspec(comment_id_t tspec_id, const tspec_data_t& tspec, std::optional<name> worker) {
     const auto& tspec_app = _proposal_tspecs.get(tspec_id);
     const auto& proposal = _proposals.get(tspec_app.foreign_id);
 
@@ -268,8 +275,15 @@ void worker::edittspec(comment_id_t tspec_id, const tspec_data_t& tspec) {
 
     require_app_member(tspec_app.author);
 
+    if (worker) {
+        eosio::check(is_account(*worker), "worker account not exists");
+    } else {
+        worker = name();
+    }
+
     _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](auto& o) {
         o.modify(tspec, proposal.state == proposal_t::STATE_TSPEC_CHOSE /* limited */);
+        o.worker = *worker;
     });
 }
 
@@ -306,7 +320,12 @@ void worker::approvetspec(comment_id_t tspec_id, eosio::name author) {
             choose_proposal_tspec(obj, tspec_app);
         });
         _proposal_tspecs.modify(tspec_app, author, [&](tspec_app_t& tspec) {
-            tspec.set_state(tspec_app_t::STATE_APPROVED);
+            if (tspec.worker != name()) {
+                tspec.set_state(tspec_app_t::STATE_WORK);
+                tspec.work_begining_time = TIMESTAMP_NOW;
+            } else {
+                tspec.set_state(tspec_app_t::STATE_APPROVED);
+            }
             deposit(tspec);
         });
     }
@@ -325,7 +344,7 @@ void worker::dapprovetspec(comment_id_t tspec_id, eosio::name author) {
     _proposal_tspec_votes.unapprove(tspec_id, author);
 }
 
-void worker::startwork(comment_id_t tspec_id, eosio::name worker) {
+void worker::startwork(comment_id_t tspec_id, name worker) {
     const auto& tspec_app = _proposal_tspecs.get(tspec_id);
     require_auth(tspec_app.author);
     eosio::check(tspec_app.state == tspec_app_t::STATE_APPROVED, "invalid state for startwork");

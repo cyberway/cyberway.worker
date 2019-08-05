@@ -108,6 +108,28 @@
                 {
                     "name": "tspec",
                     "type": "tspec_data_t"
+                },
+                {
+                    "name": "worker",
+                    "type": "name?"
+                }
+            ]
+        },
+        {
+            "name": "edittspec",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "tspec",
+                    "type": "tspec_data_t"
+                },
+                {
+                    "name": "worker",
+                    "type": "name?"
                 }
             ]
         },
@@ -232,20 +254,6 @@
                 {
                     "name": "proposal_id",
                     "type": "comment_id_t"
-                }
-            ]
-        },
-        {
-            "name": "edittspec",
-            "base": "",
-            "fields": [
-                {
-                    "name": "tspec_id",
-                    "type": "comment_id_t"
-                },
-                {
-                    "name": "tspec",
-                    "type": "tspec_data_t"
                 }
             ]
         },
@@ -522,6 +530,10 @@
             "type": "addtspec"
         },
         {
+            "name": "edittspec",
+            "type": "edittspec"
+        },
+        {
             "name": "approvetspec",
             "type": "approvetspec"
         },
@@ -556,10 +568,6 @@
         {
             "name": "editpropos",
             "type": "editpropos"
-        },
-        {
-            "name": "edittspec",
-            "type": "edittspec"
         },
         {
             "name": "reviewwork",
