@@ -352,6 +352,8 @@ void worker::startwork(comment_id_t tspec_id, name worker) {
     auto proposal_ptr = get_proposal(tspec_app.foreign_id);
     eosio::check(proposal_ptr->type == proposal_t::TYPE_TASK, "unsupported action");
 
+    eosio::check(is_account(worker), "worker account not exists");
+
     _proposal_tspecs.modify(tspec_app, tspec_app.author, [&](tspec_app_t& tspec) {
         tspec.set_state(tspec_app_t::STATE_WORK);
         tspec.worker = worker;
