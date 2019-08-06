@@ -257,7 +257,7 @@ void worker::apprtspec(comment_id_t tspec_id, name approver) {
         return;
     }
     const auto& proposal = _proposals.get(tspec.foreign_id);
-    _proposals.modify(proposal, approver, [&](auto& obj) {
+    _proposals.modify(proposal, approver, [&](auto& p) {
         p.set_state(proposal_t::STATE_TSPEC_CHOSE);
     });
     _tspecs.modify(tspec, approver, [&](auto& tspec) {
