@@ -105,13 +105,15 @@ void worker::addpropos(comment_id_t proposal_id, name author, uint8_t type) {
     });
 }
 
-void worker::editpropos(comment_id_t proposal_id) // TODO: changing type
-{
+void worker::editpropos(comment_id_t proposal_id, uint8_t type) {
+    eosio::check(type <= proposal_t::TYPE_DONE, "wrong type");
     auto proposal_ptr = get_proposal(proposal_id);
     require_app_member(proposal_ptr->author);
-    eosio::check(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state for editpropos");
 
-    _proposals.modify(proposal_ptr, proposal_ptr->author, [&](auto &o) {
+    CHECK_PROPOSAL_NO_TSPECS((*proposal_ptr));
+
+    _proposals.modify(proposal_ptr, proposal_ptr->author, [&](auto& o) {
+        o.type = type;
         o.modified = TIMESTAMP_NOW;
     });
 }
@@ -120,8 +122,7 @@ void worker::delpropos(comment_id_t proposal_id) {
     auto proposal_ptr = get_proposal(proposal_id);
     require_app_member(proposal_ptr->author);
 
-    auto tspec_index = _tspecs.get_index<"foreign"_n>();
-    eosio::check(tspec_index.find(proposal_id) == tspec_index.end(), "proposal has tspecs");
+    CHECK_PROPOSAL_NO_TSPECS((*proposal_ptr));
 
     _proposals.erase(proposal_ptr);
     _proposal_votes.erase_all(proposal_id);

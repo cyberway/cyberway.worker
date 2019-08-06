@@ -72,6 +72,20 @@
             ]
         },
         {
+            "name": "editpropos",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "type",
+                    "type": "uint8"
+                }
+            ]
+        },
+        {
             "name": "addtspec",
             "base": "",
             "fields": [
@@ -212,16 +226,6 @@
                 {
                     "name": "text",
                     "type": "string"
-                }
-            ]
-        },
-        {
-            "name": "editpropos",
-            "base": "",
-            "fields": [
-                {
-                    "name": "proposal_id",
-                    "type": "comment_id_t"
                 }
             ]
         },
@@ -490,6 +494,10 @@
             "type": "addpropos"
         },
         {
+            "name": "editpropos",
+            "type": "editpropos"
+        },
+        {
             "name": "addtspec",
             "type": "addtspec"
         },
@@ -532,10 +540,6 @@
         {
             "name": "editcomment",
             "type": "editcomment"
-        },
-        {
-            "name": "editpropos",
-            "type": "editpropos"
         },
         {
             "name": "reviewwork",
