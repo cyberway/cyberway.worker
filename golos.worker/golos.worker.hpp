@@ -26,6 +26,18 @@ using namespace std;
 
 #define LOG(format, ...) print_f("%::%: " format "\n", _self.to_string().c_str(), __FUNCTION__, ##__VA_ARGS__);
 
+#define CHECK_POST(ID, AUTHOR) { \
+    auto post = _comments.find(ID); \
+    eosio::check(post != _comments.end(), "comment not exists"); \
+    eosio::check(!post->parent_id, "comment is not root"); \
+    eosio::check(post->author == AUTHOR, "comment not your"); \
+}
+
+#define CHECK_APPROVE_TSPEC(TSPEC, APPROVER) \
+    require_app_delegate(approver); \
+    eosio::check(TSPEC.state == tspec_app_t::STATE_CREATED, "invalid state"); \
+    eosio::check(current_time_point().sec_since_epoch() <= TSPEC.created + voting_time_s, "approve time is over");
+
 namespace golos
 {
 class [[eosio::contract]] worker : public contract
@@ -82,20 +94,22 @@ public:
             return index.find(foreign_id) == index.end();
         }
 
-        void vote(const vote_t &vote) {
+        void vote(uint64_t foreign_id, name voter, bool positive) {
             auto index = votes.template get_index<"foreign"_n>();
-            for (auto vote_ptr = index.lower_bound(vote.foreign_id); vote_ptr != index.upper_bound(vote.foreign_id); vote_ptr++) {
-                if (vote_ptr->voter == vote.voter) {
-                    eosio::check(vote_ptr->positive != vote.positive, "the vote already exists");
-                    votes.modify(votes.get(vote_ptr->id), vote.voter, [&](auto &obj) {
-                        obj.positive = vote.positive;
+            for (auto vote_ptr = index.lower_bound(foreign_id); vote_ptr != index.upper_bound(foreign_id); vote_ptr++) {
+                if (vote_ptr->voter == voter) {
+                    eosio::check(vote_ptr->positive != positive, "the vote already exists");
+                    votes.modify(votes.get(vote_ptr->id), voter, [&](auto &obj) {
+                        obj.positive = positive;
                     });
                     return;
                 }
             }
-            votes.emplace(vote.voter, [&](auto &obj) {
-                obj = vote;
+            votes.emplace(voter, [&](auto &obj) {
                 obj.id = votes.available_primary_key();
+                obj.foreign_id = foreign_id;
+                obj.voter = voter;
+                obj.positive = positive;
             });
         }
 
@@ -120,28 +134,9 @@ public:
         }
     };
 
-    template <eosio::name::raw TableName>
-    struct approve_module_t: protected voting_module_t<TableName> {
-        using voting_module_t<TableName>::count_positive;
-        using voting_module_t<TableName>::empty;
-        using voting_module_t<TableName>::erase_all;
-
-        approve_module_t(const eosio::name& code, uint64_t scope): voting_module_t<TableName>::voting_module_t(code, scope) {}
-
-        void approve(uint64_t foreign_id, const eosio::name &approver) {
-            vote_t v {
-                .voter = approver,
-                .positive = true,
-                .foreign_id = foreign_id
-            };
-
-            voting_module_t<TableName>::vote(v);
-        }
-
-        void unapprove(uint64_t foreign_id, const eosio::name &approver) {
-            voting_module_t<TableName>::erase(foreign_id, approver);
-        }
-    };
+    voting_module_t<"proposalsv"_n> _proposal_votes;
+    voting_module_t<"tspecv"_n> _tspec_votes;
+    voting_module_t<"tspecrv"_n> _tspec_review_votes;
 
     struct tspec_data_t {
         asset specification_cost;
@@ -240,7 +235,7 @@ public:
     multi_index<"tspecs"_n, tspec_app_t,
         indexed_by<"foreign"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::foreign_key>>,
         indexed_by<"resultc"_n, const_mem_fun<tspec_app_t, std::optional<comment_id_t>, &tspec_app_t::by_result>>,
-        indexed_by<"payout"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::by_payout>>> _proposal_tspecs;
+        indexed_by<"payout"_n, const_mem_fun<tspec_app_t, uint64_t, &tspec_app_t::by_payout>>> _tspecs;
 
     struct [[eosio::table]] proposal_t {
         enum state_t {
@@ -278,10 +273,6 @@ public:
     };
     multi_index<"funds"_n, fund_t> _funds;
 
-    voting_module_t<"proposalsv"_n> _proposal_votes;
-    approve_module_t<"proposalstsv"_n> _proposal_tspec_votes;
-    voting_module_t<"tspecrv"_n> _tspec_review_votes;
-
     struct tspecstate_event {
         comment_id_t id;
         uint8_t state;
@@ -308,8 +299,8 @@ public:
         _comments(_self, _self.value),
         _proposal_votes(_self, _self.value),
         _tspec_review_votes(_self, _self.value),
-        _proposal_tspecs(_self, _self.value),
-        _proposal_tspec_votes(_self, _self.value) {}
+        _tspecs(_self, _self.value),
+        _tspec_votes(_self, _self.value) {}
 
     [[eosio::action]] void createpool(eosio::symbol token_symbol);
 
@@ -326,8 +317,9 @@ public:
     [[eosio::action]] void addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t proposal_id, const tspec_data_t& tspec, std::optional<name> worker);
     [[eosio::action]] void edittspec(comment_id_t tspec_id, const tspec_data_t &tspec, std::optional<name> worker);
     [[eosio::action]] void deltspec(comment_id_t tspec_id);
-    [[eosio::action]] void approvetspec(comment_id_t tspec_id, eosio::name author);
-    [[eosio::action]] void dapprovetspec(comment_id_t tspec_id, eosio::name author);
+    [[eosio::action]] void apprtspec(comment_id_t tspec_id, name approver);
+    [[eosio::action]] void dapprtspec(comment_id_t tspec_id, name approver);
+    [[eosio::action]] void unapprtspec(comment_id_t tspec_id, name approver);
     [[eosio::action]] void startwork(comment_id_t tspec_id, name worker);
     [[eosio::action]] void cancelwork(comment_id_t tspec_id, eosio::name initiator);
     [[eosio::action]] void acceptwork(comment_id_t tspec_id, comment_id_t result_comment_id);

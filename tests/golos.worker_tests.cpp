@@ -161,9 +161,9 @@ public:
         {
             const name &delegate = delegates[i];
 
-            ASSERT_SUCCESS(worker.push_action(delegate, N(approvetspec), mvo()
+            ASSERT_SUCCESS(worker.push_action(delegate, N(apprtspec), mvo()
                 ("tspec_id", tspec_app_id)
-                ("author", delegate.to_string())));
+                ("approver", delegate.to_string())));
         }
 
         BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
@@ -501,13 +501,13 @@ try
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["development_cost"].as<asset>().to_string(), "2.000 APP");
 
             const name& approver = delegates[0];
-            ASSERT_SUCCESS(worker.push_action(approver, N(approvetspec), mvo()
+            ASSERT_SUCCESS(worker.push_action(approver, N(apprtspec), mvo()
                 ("tspec_id", tspec_app_id)
-                ("author", approver)));
+                ("approver", approver)));
 
-            ASSERT_SUCCESS(worker.push_action(approver, N(dapprovetspec), mvo()
+            ASSERT_SUCCESS(worker.push_action(approver, N(unapprtspec), mvo()
                 ("tspec_id", tspec_app_id)
-                ("author", approver)));
+                ("approver", approver)));
 
             ASSERT_SUCCESS(worker.push_action(tspec_author, N(deltspec), mvo()
                 ("tspec_id", tspec_app_id)));
