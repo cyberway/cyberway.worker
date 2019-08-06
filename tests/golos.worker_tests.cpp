@@ -706,9 +706,9 @@ try
     for (size_t i = 0; i < delegates_51; i++) {
         const auto& delegate = delegates[i];
 
-        ASSERT_SUCCESS(worker.push_action(delegate, N(approvetspec), mvo()
+        ASSERT_SUCCESS(worker.push_action(delegate, N(apprtspec), mvo()
             ("tspec_id", tspec_id)
-            ("author", delegate.to_string())));
+            ("approver", delegate.to_string())));
     }
 
     BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT);
