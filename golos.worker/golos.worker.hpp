@@ -286,7 +286,6 @@ protected:
     const auto get_proposal(comment_id_t proposal_id);
 
     void deposit(tspec_app_t& tspec_app);
-    void choose_proposal_tspec(proposal_t& proposal, const tspec_app_t &tspec_app);
     void refund(tspec_app_t& tspec_app, eosio::name modifier);
     void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal);
     void send_tspecstate_event(const tspec_app_t& tspec_app, tspec_app_t::state_t state);
@@ -304,8 +303,7 @@ public:
 
     [[eosio::action]] void createpool(eosio::symbol token_symbol);
 
-    [[eosio::action]] void addpropos(comment_id_t proposal_id, const eosio::name& author);
-    [[eosio::action]] void addproposdn(comment_id_t proposal_id, const eosio::name& author, const eosio::name& worker, const tspec_data_t& tspec);
+    [[eosio::action]] void addpropos(comment_id_t proposal_id, name author, uint8_t type);
     [[eosio::action]] void editpropos(comment_id_t proposal_id);
     [[eosio::action]] void delpropos(comment_id_t proposal_id);
     [[eosio::action]] void votepropos(comment_id_t proposal_id, eosio::name voter, uint8_t positive);

@@ -64,28 +64,10 @@
                 {
                     "name": "author",
                     "type": "name"
-                }
-            ]
-        },
-        {
-            "name": "addproposdn",
-            "base": "",
-            "fields": [
-                {
-                    "name": "proposal_id",
-                    "type": "comment_id_t"
                 },
                 {
-                    "name": "author",
-                    "type": "name"
-                },
-                {
-                    "name": "worker",
-                    "type": "name"
-                },
-                {
-                    "name": "tspec",
-                    "type": "tspec_data_t"
+                    "name": "type",
+                    "type": "uint8"
                 }
             ]
         },
@@ -506,10 +488,6 @@
         {
             "name": "addpropos",
             "type": "addpropos"
-        },
-        {
-            "name": "addproposdn",
-            "type": "addproposdn"
         },
         {
             "name": "addtspec",
