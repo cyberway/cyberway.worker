@@ -293,13 +293,14 @@ void worker::apprtspec(comment_id_t tspec_id, name approver) {
     _tspecs.modify(tspec, approver, [&](auto& tspec) {
         if (tspec.worker != name()) {
             tspec.set_state(tspec_app_t::STATE_WORK);
+            send_tspecstate_event(tspec, tspec_app_t::STATE_WORK);
             tspec.work_begining_time = TIMESTAMP_NOW;
         } else {
             tspec.set_state(tspec_app_t::STATE_APPROVED);
+            send_tspecstate_event(tspec, tspec_app_t::STATE_APPROVED);
         }
         deposit(tspec);
     });
-    send_tspecstate_event(tspec, tspec_app_t::STATE_APPROVED);
 }
 
 void worker::dapprtspec(comment_id_t tspec_id, name approver) {
