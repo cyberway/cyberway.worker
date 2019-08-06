@@ -38,6 +38,11 @@ using namespace std;
     eosio::check(TSPEC.state == tspec_app_t::STATE_CREATED, "invalid state"); \
     eosio::check(current_time_point().sec_since_epoch() <= TSPEC.created + voting_time_s, "approve time is over");
 
+#define CHECK_PROPOSAL_NO_TSPECS(PROPOSAL) {\
+    auto tspec_index = _tspecs.get_index<"foreign"_n>();\
+    eosio::check(tspec_index.find(PROPOSAL.id) == tspec_index.end(), "proposal has tspecs");\
+}
+
 namespace golos
 {
 class [[eosio::contract]] worker : public contract
@@ -286,7 +291,6 @@ protected:
     const auto get_proposal(comment_id_t proposal_id);
 
     void deposit(tspec_app_t& tspec_app);
-    void choose_proposal_tspec(proposal_t& proposal, const tspec_app_t &tspec_app);
     void refund(tspec_app_t& tspec_app, eosio::name modifier);
     void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal);
     void send_tspecstate_event(const tspec_app_t& tspec_app, tspec_app_t::state_t state);
@@ -304,9 +308,8 @@ public:
 
     [[eosio::action]] void createpool(eosio::symbol token_symbol);
 
-    [[eosio::action]] void addpropos(comment_id_t proposal_id, const eosio::name& author);
-    [[eosio::action]] void addproposdn(comment_id_t proposal_id, const eosio::name& author, const eosio::name& worker, const tspec_data_t& tspec);
-    [[eosio::action]] void editpropos(comment_id_t proposal_id);
+    [[eosio::action]] void addpropos(comment_id_t proposal_id, name author, uint8_t type);
+    [[eosio::action]] void editpropos(comment_id_t proposal_id, uint8_t type);
     [[eosio::action]] void delpropos(comment_id_t proposal_id);
     [[eosio::action]] void votepropos(comment_id_t proposal_id, eosio::name voter, uint8_t positive);
 

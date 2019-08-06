@@ -39,6 +39,11 @@ enum proposal_state_t {
     STATE_TSPEC_CHOSE
 };
 
+enum type_t {
+    TYPE_TASK,
+    TYPE_DONE
+};
+
 enum tspec_state_t {
     STATE_CREATED = 1,
     STATE_APPROVED,
@@ -112,7 +117,8 @@ public:
             ("text", long_text)));
         ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
             ("proposal_id", proposal_id)
-            ("author", proposal_author)));
+            ("author", proposal_author)
+            ("type", static_cast<uint8_t>(TYPE_TASK))));
 
         produce_blocks(1);
 
@@ -225,7 +231,8 @@ try
             ("proposal_id", proposal_id)
             ("author", author_account)
             ("title", "Proposal #1")
-            ("description", "Description #1")));
+            ("description", "Description #1")
+            ("type", static_cast<uint8_t>(TYPE_TASK))));
         return;
         auto proposal_row = worker.get_proposal(proposal_id);
         BOOST_REQUIRE_EQUAL(proposal_row["state"], STATE_TSPEC_APP);
@@ -373,7 +380,8 @@ try
         ("text", "Proposal #1")));
     ASSERT_SUCCESS(worker.push_action(members[0], N(addpropos), mvo()
         ("proposal_id", proposal_id)
-        ("author", members[0])));
+        ("author", members[0])
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
 
     BOOST_REQUIRE_EQUAL(worker.get_proposal_votes(worker_code_account).size(), 0);
 
@@ -451,7 +459,8 @@ try
             ("text", "Proposal #1")));
         ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
             ("proposal_id", proposal_id)
-            ("author", proposal_author))
+            ("author", proposal_author)
+            ("type", static_cast<uint8_t>(TYPE_TASK)))
         );
 
         BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
@@ -540,7 +549,8 @@ try
         ("text", "Proposal #1")));
     ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
         ("proposal_id", proposal_id)
-        ("author", proposal_author))
+        ("author", proposal_author)
+        ("type", static_cast<uint8_t>(TYPE_TASK)))
     );
 
     BOOST_REQUIRE_EQUAL(worker.get_proposals(worker_code_account).size(), 1);
@@ -662,45 +672,54 @@ try
 
     auto& author_account = members[0];
     auto& worker_account = members[1];
-    uint64_t proposal_id = 1;
+    uint64_t proposal_id = 0;
+    uint64_t tspec_id = 1;
     int payments_count = 3;
 
     ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
         ("comment_id", proposal_id)
         ("author", author_account)
-        ("text", "Sposnored proposal #1"))); // TODO: tspec should have separate post
-    ASSERT_SUCCESS(worker.push_action(author_account, N(addproposdn), mvo()
+        ("text", "Sponsored proposal #1")));
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
         ("proposal_id", proposal_id)
         ("author", author_account)
-        ("worker", worker_account)
+        ("type", static_cast<uint8_t>(TYPE_DONE))));
+
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
+        ("comment_id", tspec_id)
+        ("author", author_account)
+        ("text", "Technical specification #1")));
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addtspec), mvo()
+        ("tspec_id", tspec_id)
+        ("author", author_account)
+        ("proposal_id", proposal_id)
         ("tspec", mvo()
             ("specification_cost", "5.000 APP")
             ("specification_eta", 1)
             ("development_cost", "5.000 APP")
             ("development_eta", 1)
             ("payments_count", payments_count)
-            ("payments_interval", 1)
-        )));
+            ("payments_interval", 1))
+        ("worker", worker_account)));
 
-    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(0), STATE_DELEGATES_REVIEW); // addproposdn uses available_primary_key
+    // vote for the 0 technical specification application
+    for (size_t i = 0; i < delegates_51; i++) {
+        const auto& delegate = delegates[i];
 
-    int i = 0;
-    for (const auto &account : delegates) {
-        ASSERT_SUCCESS(worker.push_action(account, N(reviewwork), mvo()
-            ("tspec_id", 0) // addproposdn uses available_primary_key
-            ("reviewer", account.to_string())
-            ("status", (i + 1) % 2)));
-        i++;
+        ASSERT_SUCCESS(worker.push_action(delegate, N(apprtspec), mvo()
+            ("tspec_id", tspec_id)
+            ("approver", delegate.to_string())));
     }
 
-    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(0), STATE_PAYMENT); // addproposdn uses available_primary_key
+    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT);
 
     for (int i = 0; i < payments_count; i++) {
+        produce_block();
         ASSERT_SUCCESS(worker.push_action(worker_account, N(payout), mvo()
-            ("ram_payer", worker_account))); // addproposdn uses available_primary_key
+            ("ram_payer", worker_account)));
     }
 
-    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(0), STATE_PAYMENT_COMPLETE); // addproposdn uses available_primary_key
+    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT_COMPLETE);
     BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
 
     BOOST_REQUIRE_EQUAL(token.get_account(worker_account)["balance"], "15.000 APP");
