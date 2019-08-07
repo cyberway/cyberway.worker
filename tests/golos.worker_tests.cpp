@@ -136,9 +136,7 @@ public:
             ("proposal_id", proposal_id)
             ("tspec", mvo()
                 ("specification_cost", "5.000 APP")
-                ("specification_eta", 1)
                 ("development_cost", "5.000 APP")
-                ("development_eta", 1)
                 ("payments_count", 1)
                 ("payments_interval", 1))));
 
@@ -154,9 +152,7 @@ public:
             ("proposal_id", proposal_id)
             ("tspec", mvo()
                 ("specification_cost", "5.000 APP")
-                ("specification_eta", 1)
                 ("development_cost", "5.000 APP")
-                ("development_eta", 1)
                 ("payments_count", 2)
                 ("payments_interval", 1))));
 
@@ -176,32 +172,6 @@ public:
         // if technical specification application was upvoted, `tspec_deposit` should be deposited from the application fund
         BOOST_REQUIRE_EQUAL(worker.get_tspec(tspec_app_id)["deposit"].as<asset>(), tspec_deposit);
         BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_app_id), STATE_APPROVED);
-
-        /* ok,technical specification application has been choosen,
-        now technical specification application author should publish
-        a final technical specification */
-
-        BOOST_REQUIRE_EQUAL(worker.push_action(tspec_author, N(edittspec), mvo()
-            ("tspec_id", tspec_app_id)
-            ("tspec", mvo()
-                ("specification_cost", "10.000 APP")
-                ("specification_eta", 1)
-                ("development_cost", "10.000 APP")
-                ("development_eta", 1)
-                ("payments_count", 1)
-                ("payments_interval", 1))), wasm_assert_msg("cost can't be modified"));
-
-        BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
-
-        ASSERT_SUCCESS(worker.push_action(tspec_author, N(edittspec), mvo()
-            ("tspec_id", tspec_app_id)
-            ("tspec", mvo()
-                ("specification_cost", "0.000 APP")
-                ("specification_eta", 1)
-                ("development_cost", "0.000 APP")
-                ("development_eta", 1)
-                ("payments_count", 1)
-                ("payments_interval", 1))));
 
         BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
 
@@ -478,9 +448,7 @@ try
                 ("proposal_id", proposal_id)
                 ("tspec", mvo()
                     ("specification_cost", "1.000 APP")
-                    ("specification_eta", 1)
                     ("development_cost", "1.000 APP")
-                    ("development_eta", 1)
                     ("payments_count", 1)
                     ("payments_interval", 1));
             ASSERT_SUCCESS(worker.push_action(tspec_author, N(addtspec), tspec_app));
@@ -488,9 +456,7 @@ try
             auto tspec_row = worker.get_tspec(tspec_app_id);
             BOOST_REQUIRE_EQUAL(tspec_row["id"].as_int64(), tspec_app_id);
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["specification_cost"].as<asset>().to_string(), tspec_app["tspec"]["specification_cost"]);
-            BOOST_REQUIRE_EQUAL(tspec_row["data"]["specification_eta"], tspec_app["tspec"]["specification_eta"]);
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["development_cost"].as<asset>().to_string(), tspec_app["tspec"]["development_cost"]);
-            BOOST_REQUIRE_EQUAL(tspec_row["data"]["development_eta"], tspec_app["tspec"]["development_eta"]);
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["payments_count"], tspec_app["tspec"]["payments_count"]);
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["payments_interval"], tspec_app["tspec"]["payments_interval"]);
 
@@ -498,9 +464,7 @@ try
                 ("tspec_id", tspec_app_id)
                 ("tspec", mvo()
                     ("specification_cost", "2.000 APP")
-                    ("specification_eta", 2)
                     ("development_cost", "2.000 APP")
-                    ("development_eta", 2)
                     ("payments_count", 2)
                     ("payments_interval", 2))
                 ("tspec_text", "Technical specification")));
@@ -577,9 +541,7 @@ try
             ("proposal_id", proposal_id)
             ("tspec", mvo()
                 ("specification_cost", "1.000 APP")
-                ("specification_eta", 1)
                 ("development_cost", "1.000 APP")
-                ("development_eta", 1)
                 ("payments_count", 1)
                 ("payments_interval", 1));
 
@@ -695,9 +657,7 @@ try
         ("proposal_id", proposal_id)
         ("tspec", mvo()
             ("specification_cost", "5.000 APP")
-            ("specification_eta", 1)
             ("development_cost", "5.000 APP")
-            ("development_eta", 1)
             ("payments_count", payments_count)
             ("payments_interval", 1))
         ("worker", worker_account)));

@@ -210,9 +210,7 @@ void worker::edittspec(comment_id_t tspec_id, const tspec_data_t& tspec, std::op
     const auto& tspec_app = _tspecs.get(tspec_id);
     const auto& proposal = _proposals.get(tspec_app.foreign_id);
 
-    eosio::check(proposal.state == proposal_t::STATE_TSPEC_APP || 
-                 proposal.state == proposal_t::STATE_TSPEC_CHOSE, "invalid state for edittspec");
-    eosio::check(proposal.type == proposal_t::TYPE_TASK, "unsupported action");
+    eosio::check(proposal.state == proposal_t::STATE_TSPEC_APP, "invalid state");
 
     eosio::check(get_state().token_symbol == tspec.specification_cost.symbol, "invalid symbol for the specification cost");
     eosio::check(get_state().token_symbol == tspec.development_cost.symbol, "invalid symbol for the development cost");
@@ -230,8 +228,9 @@ void worker::edittspec(comment_id_t tspec_id, const tspec_data_t& tspec, std::op
     }
 
     _tspecs.modify(tspec_app, tspec_app.author, [&](auto& o) {
-        o.modify(tspec, proposal.state == proposal_t::STATE_TSPEC_CHOSE /* limited */);
+        o.data = tspec;
         o.worker = *worker;
+        o.modified = TIMESTAMP_NOW;
     });
 }
 
