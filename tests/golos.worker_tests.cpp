@@ -645,10 +645,15 @@ try
 
         for (size_t i = 0; i < delegates.size(); i++) {
             const auto& delegate = delegates[i];
-            ASSERT_SUCCESS(worker.push_action(delegate, N(reviewwork), mvo()
-                ("tspec_id", tspec_id)
-                ("reviewer", delegate.to_string())
-                ("status", (i + 1) % 2)));
+            if ((i + 1) % 2) {
+                ASSERT_SUCCESS(worker.push_action(delegate, N(apprwork), mvo()
+                    ("tspec_id", tspec_id)
+                    ("approver", delegate.to_string())));
+            } else {
+                ASSERT_SUCCESS(worker.push_action(delegate, N(dapprwork), mvo()
+                    ("tspec_id", tspec_id)
+                    ("approver", delegate.to_string())));
+            }
         }
 
         BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT);
@@ -800,11 +805,10 @@ try
     BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply - tspec_deposit);
 
     for (size_t i = 0; i < delegates.size() * 3 / 4 + 1; i++) {
-        const name &delegate = delegates[i];
-        ASSERT_SUCCESS(worker.push_action(delegate, N(reviewwork), mvo()
+        const auto& delegate = delegates[i];
+        ASSERT_SUCCESS(worker.push_action(delegate, N(dapprwork), mvo()
             ("tspec_id", tspec_id)
-            ("reviewer", delegate)
-            ("status", 0)));
+            ("approver", delegate)));
     }
 
     BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED_BY_WITNESSES);

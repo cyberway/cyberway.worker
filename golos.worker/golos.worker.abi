@@ -54,6 +54,30 @@
             ]
         },
         {
+            "name": "editcomment",
+            "base": "",
+            "fields": [
+                {
+                    "name": "comment_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "text",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "delcomment",
+            "base": "",
+            "fields": [
+                {
+                    "name": "comment_id",
+                    "type": "comment_id_t"
+                }
+            ]
+        },
+        {
             "name": "addpropos",
             "base": "",
             "fields": [
@@ -82,6 +106,16 @@
                 {
                     "name": "type",
                     "type": "uint8"
+                }
+            ]
+        },
+        {
+            "name": "delpropos",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "comment_id_t"
                 }
             ]
         },
@@ -130,7 +164,17 @@
             ]
         },
         {
-            "name": "apprtspec",
+            "name": "deltspec",
+            "base": "",
+            "fields": [
+                {
+                    "name": "tspec_id",
+                    "type": "comment_id_t"
+                }
+            ]
+        },
+        {
+            "name": "approve",
             "base": "",
             "fields": [
                 {
@@ -186,50 +230,6 @@
             ]
         },
         {
-            "name": "delcomment",
-            "base": "",
-            "fields": [
-                {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
-                }
-            ]
-        },
-        {
-            "name": "delpropos",
-            "base": "",
-            "fields": [
-                {
-                    "name": "proposal_id",
-                    "type": "comment_id_t"
-                }
-            ]
-        },
-        {
-            "name": "deltspec",
-            "base": "",
-            "fields": [
-                {
-                    "name": "tspec_id",
-                    "type": "comment_id_t"
-                }
-            ]
-        },
-        {
-            "name": "editcomment",
-            "base": "",
-            "fields": [
-                {
-                    "name": "comment_id",
-                    "type": "comment_id_t"
-                },
-                {
-                    "name": "text",
-                    "type": "string"
-                }
-            ]
-        },
-        {
             "name": "fund_t",
             "base": "",
             "fields": [
@@ -270,24 +270,6 @@
                 {
                     "name": "modified",
                     "type": "uint64"
-                }
-            ]
-        },
-        {
-            "name": "reviewwork",
-            "base": "",
-            "fields": [
-                {
-                    "name": "tspec_id",
-                    "type": "comment_id_t"
-                },
-                {
-                    "name": "reviewer",
-                    "type": "name"
-                },
-                {
-                    "name": "status",
-                    "type": "uint8"
                 }
             ]
         },
@@ -478,14 +460,6 @@
     ],
     "actions": [
         {
-            "name": "acceptwork",
-            "type": "acceptwork"
-        },
-        {
-            "name": "unacceptwork",
-            "type": "unacceptwork"
-        },
-        {
             "name": "addcomment",
             "type": "addcomment"
         },
@@ -507,19 +481,43 @@
         },
         {
             "name": "apprtspec",
-            "type": "apprtspec"
+            "type": "approve"
         },
         {
             "name": "dapprtspec",
-            "type": "apprtspec"
+            "type": "approve"
         },
         {
             "name": "unapprtspec",
-            "type": "apprtspec"
+            "type": "approve"
+        },
+        {
+            "name": "startwork",
+            "type": "startwork"
         },
         {
             "name": "cancelwork",
             "type": "cancelwork"
+        },
+        {
+            "name": "acceptwork",
+            "type": "acceptwork"
+        },
+        {
+            "name": "unacceptwork",
+            "type": "unacceptwork"
+        },
+        {
+            "name": "apprwork",
+            "type": "approve"
+        },
+        {
+            "name": "dapprwork",
+            "type": "approve"
+        },
+        {
+            "name": "unapprwork",
+            "type": "approve"
         },
         {
             "name": "createpool",
@@ -540,14 +538,6 @@
         {
             "name": "editcomment",
             "type": "editcomment"
-        },
-        {
-            "name": "reviewwork",
-            "type": "reviewwork"
-        },
-        {
-            "name": "startwork",
-            "type": "startwork"
         },
         {
             "name": "votepropos",

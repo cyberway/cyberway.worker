@@ -201,11 +201,6 @@ public:
             STATE_DISAPPROVED_BY_WITNESSES
         };
 
-        enum review_status_t {
-            STATUS_REJECT = 0,
-            STATUS_ACCEPT = 1
-        };
-
         comment_id_t id;
         comment_id_t foreign_id;
         eosio::name author;
@@ -320,14 +315,20 @@ public:
     [[eosio::action]] void addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t proposal_id, const tspec_data_t& tspec, std::optional<name> worker);
     [[eosio::action]] void edittspec(comment_id_t tspec_id, const tspec_data_t &tspec, std::optional<name> worker);
     [[eosio::action]] void deltspec(comment_id_t tspec_id);
+
     [[eosio::action]] void apprtspec(comment_id_t tspec_id, name approver);
     [[eosio::action]] void dapprtspec(comment_id_t tspec_id, name approver);
     [[eosio::action]] void unapprtspec(comment_id_t tspec_id, name approver);
+
     [[eosio::action]] void startwork(comment_id_t tspec_id, name worker);
     [[eosio::action]] void cancelwork(comment_id_t tspec_id, eosio::name initiator);
     [[eosio::action]] void acceptwork(comment_id_t tspec_id, comment_id_t result_comment_id);
     [[eosio::action]] void unacceptwork(comment_id_t tspec_id);
-    [[eosio::action]] void reviewwork(comment_id_t tspec_id, eosio::name reviewer, uint8_t status);
+
+    [[eosio::action]] void apprwork(comment_id_t tspec_id, name approver);
+    [[eosio::action]] void dapprwork(comment_id_t tspec_id, name approver);
+    [[eosio::action]] void unapprwork(comment_id_t tspec_id, name approver);
+
     [[eosio::action]] void payout(name ram_payer);
 
     void on_transfer(name from, name to, eosio::asset quantity, std::string memo);
