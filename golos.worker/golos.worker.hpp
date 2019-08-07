@@ -145,46 +145,11 @@ public:
 
     struct tspec_data_t {
         asset specification_cost;
-        uint32_t specification_eta;
         asset development_cost;
-        uint32_t development_eta;
         uint16_t payments_count;
         uint32_t payments_interval;
 
-        EOSLIB_SERIALIZE(tspec_data_t, (specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count)(payments_interval))
-
-        void update(const tspec_data_t &that, bool limited) {
-            bool modified = false;
-
-            if (that.specification_cost.amount != 0) {
-                eosio::check(!limited, "cost can't be modified");
-                specification_cost = that.specification_cost;
-                modified = true;
-            }
-
-            if (that.specification_eta != 0) {
-                specification_eta = that.specification_eta;
-                modified = true;
-            }
-
-            if (that.development_cost.amount != 0) {
-                eosio::check(!limited, "cost can be modified");
-                development_cost = that.development_cost;
-                modified = true;
-            }
-
-            if (that.development_eta != 0) {
-                development_eta = that.development_eta;
-                modified = true;
-            }
-
-            if (that.payments_count != 0) {
-                payments_count = that.payments_count;
-                modified = true;
-            }
-
-            eosio::check(modified, "nothing to modify");
-        }
+        EOSLIB_SERIALIZE(tspec_data_t, (specification_cost)(development_cost)(payments_count)(payments_interval))
     };
 
     struct [[eosio::table]] tspec_app_t {
@@ -219,11 +184,6 @@ public:
         EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(state)(data)(fund_name)(deposit)(worker)
             (work_begining_time)(result_comment_id)(worker_payments_count)(next_payout)
             (created)(modified))
-
-        void modify(const tspec_data_t &that, bool limited = false) {
-            data.update(that, limited);
-            modified = TIMESTAMP_NOW;
-        }
 
         uint64_t primary_key() const { return id; }
         uint64_t foreign_key() const { return foreign_id; }

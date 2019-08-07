@@ -372,16 +372,8 @@
                     "type": "asset"
                 },
                 {
-                    "name": "specification_eta",
-                    "type": "uint32"
-                },
-                {
                     "name": "development_cost",
                     "type": "asset"
-                },
-                {
-                    "name": "development_eta",
-                    "type": "uint32"
                 },
                 {
                     "name": "payments_count",
