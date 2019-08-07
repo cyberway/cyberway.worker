@@ -358,55 +358,55 @@ void worker::unacceptwork(comment_id_t tspec_id) {
     });
 }
 
-void worker::reviewwork(comment_id_t tspec_id, eosio::name reviewer, uint8_t status) {
-    require_app_delegate(reviewer);
-
+void worker::apprwork(comment_id_t tspec_id, name approver) {
+    require_app_delegate(approver);
     const auto& tspec = _tspecs.get(tspec_id);
+    eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW, "invalid state");
+    _tspec_review_votes.vote(tspec_id, approver, true);
 
-    _tspec_review_votes.vote(tspec_id, reviewer, status == tspec_app_t::STATUS_ACCEPT);
-
-    const auto& proposal = _proposals.get(tspec.foreign_id);
-
-    if (static_cast<tspec_app_t::review_status_t>(status) == tspec_app_t::STATUS_REJECT) {
-        eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW ||
-                     tspec.state == tspec_app_t::STATE_WORK ||
-                     tspec.state == tspec_app_t::STATE_WIP ||
-                     tspec.state == tspec_app_t::STATE_PAYMENT,
-                     "invalid state for negative review");
-
-        size_t negative_votes_count = _tspec_review_votes.count_negative(tspec_id);
-        if (negative_votes_count >= config::witness_count_75)
-        {
-            //TODO: check that all voters are delegates in this moment
-            send_tspecstate_event(tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES);
-
-            if (tspec.state == tspec_app_t::STATE_PAYMENT) {
-                close_tspec(reviewer, tspec, tspec_app_t::STATE_DISAPPROVED_BY_WITNESSES, proposal);
-            } else {
-                close_tspec(reviewer, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
-            }
-        }
-    } else if (static_cast<tspec_app_t::review_status_t>(status) == tspec_app_t::STATUS_ACCEPT) {
-        eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW, "invalid state for positive review");
-
-        size_t positive_votes_count = _tspec_review_votes.count_positive(tspec_id);
-        if (positive_votes_count >= config::witness_count_51)
-        {
-            //TODO: check that all voters are delegates in this moment
-            send_tspecstate_event(tspec, tspec_app_t::STATE_PAYMENT);
-
-            _tspecs.modify(tspec, reviewer, [&](auto& tspec) {
-                if (tspec.deposit.amount == 0 && proposal.type == proposal_t::TYPE_DONE) {
-                    deposit(tspec);
-                }
-
-                tspec.set_state(tspec_app_t::STATE_PAYMENT); 
-                tspec.next_payout = TIMESTAMP_NOW + tspec.data.payments_interval;
-            });
-        }
-    } else {
-        eosio::check(false, "wrong status");
+    //TODO: check that all voters are delegates in this moment
+    if (_tspec_review_votes.count_positive(tspec_id) < config::witness_count_51) {
+        return;
     }
+    const auto& proposal = _proposals.get(tspec.foreign_id);
+    _tspecs.modify(tspec, approver, [&](auto& tspec) {
+        if (tspec.deposit.amount == 0 && proposal.type == proposal_t::TYPE_DONE) {
+            deposit(tspec);
+        }
+
+        tspec.set_state(tspec_app_t::STATE_PAYMENT);
+        send_tspecstate_event(tspec, tspec_app_t::STATE_PAYMENT);
+        tspec.next_payout = TIMESTAMP_NOW + tspec.data.payments_interval;
+    });
+}
+
+void worker::dapprwork(comment_id_t tspec_id, name approver) {
+    require_app_delegate(approver);
+    const auto& tspec = _tspecs.get(tspec_id);
+    eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW || tspec.state == tspec_app_t::STATE_WORK ||
+        tspec.state == tspec_app_t::STATE_WIP || tspec.state == tspec_app_t::STATE_PAYMENT, "invalid state");
+    _tspec_review_votes.vote(tspec_id, approver, false);
+
+    //TODO: check that all voters are delegates in this moment
+    if (_tspec_review_votes.count_negative(tspec_id) < config::witness_count_75) {
+        return;
+    }
+    const auto& proposal = _proposals.get(tspec.foreign_id);
+    if (tspec.state == tspec_app_t::STATE_PAYMENT) {
+        close_tspec(approver, tspec, tspec_app_t::STATE_DISAPPROVED_BY_WITNESSES, proposal);
+        send_tspecstate_event(tspec, tspec_app_t::STATE_DISAPPROVED_BY_WITNESSES);
+    } else {
+        close_tspec(approver, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
+        send_tspecstate_event(tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES);
+    }
+}
+
+void worker::unapprwork(comment_id_t tspec_id, name approver) {
+    require_app_delegate(approver);
+    const auto& tspec = _tspecs.get(tspec_id);
+    eosio::check(tspec.state == tspec_app_t::STATE_DELEGATES_REVIEW || tspec.state == tspec_app_t::STATE_WORK ||
+        tspec.state == tspec_app_t::STATE_WIP || tspec.state == tspec_app_t::STATE_PAYMENT, "invalid state");
+    _tspec_review_votes.erase(tspec_id, approver);
 }
 
 void worker::payout(name ram_payer) {
@@ -498,6 +498,7 @@ void worker::on_transfer(name from, name to, eosio::asset quantity, std::string 
 DISPATCH_WITH_TRANSFER(golos::worker, config::token_name, on_transfer, (createpool)
     (addpropos)(editpropos)(delpropos)(votepropos)
     (addcomment)(editcomment)(delcomment)
-    (addtspec)(edittspec)(deltspec)(apprtspec)(dapprtspec)(unapprtspec)(startwork)(acceptwork)(unacceptwork)(reviewwork)(cancelwork)
+    (addtspec)(edittspec)(deltspec)(apprtspec)(dapprtspec)(unapprtspec)
+    (startwork)(cancelwork)(acceptwork)(unacceptwork)(apprwork)(dapprwork)(unapprwork)
     (payout)
 )
