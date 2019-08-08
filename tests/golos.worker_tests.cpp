@@ -355,40 +355,49 @@ try
 
     BOOST_REQUIRE_EQUAL(worker.get_proposal_votes(worker_code_account).size(), 0);
 
-    for (size_t i = 0; i < delegates.size(); i++)
-    {
-        name &delegate = delegates[i];
-
-        ASSERT_SUCCESS(worker.push_action(delegate, N(votepropos), mvo()
-            ("proposal_id", proposal_id)
-            ("voter", delegate)
-            ("positive", (i + 1) % 2)));
+    for (size_t i = 0; i < delegates.size(); i++) {
+        auto& delegate = delegates[i];
+        if ((i + 1) % 2) {
+            ASSERT_SUCCESS(worker.push_action(delegate, N(upvtpropos), mvo()
+                ("proposal_id", proposal_id)
+                ("voter", delegate)));
+        } else {
+            ASSERT_SUCCESS(worker.push_action(delegate, N(downvtpropos), mvo()
+                ("proposal_id", proposal_id)
+                ("voter", delegate)));
+        }
     }
 
     BOOST_REQUIRE_EQUAL(worker.get_proposal_votes(worker_code_account).size(), delegates.size());
 
     // revote with the same `positive` value
-    for (size_t i = 0; i < delegates.size(); i++)
-    {
-        name &delegate = delegates[i];
-
-        BOOST_REQUIRE_EQUAL(worker.push_action(delegate, N(votepropos), mvo()
-            ("proposal_id", proposal_id)
-            ("voter", delegate)
-            ("positive", (i + 1) % 2)), wasm_assert_msg("the vote already exists"));
+    for (size_t i = 0; i < delegates.size(); i++) {
+        auto& delegate = delegates[i];
+        if ((i + 1) % 2) {
+            BOOST_REQUIRE_EQUAL(worker.push_action(delegate, N(upvtpropos), mvo()
+                ("proposal_id", proposal_id)
+                ("voter", delegate)), wasm_assert_msg("the vote already exists"));
+        } else {
+            BOOST_REQUIRE_EQUAL(worker.push_action(delegate, N(downvtpropos), mvo()
+                ("proposal_id", proposal_id)
+                ("voter", delegate)), wasm_assert_msg("the vote already exists"));
+        }
     }
 
     BOOST_REQUIRE_EQUAL(worker.get_proposal_votes(worker_code_account).size(), delegates.size());
 
     // revote with the different `positive` value
-    for (size_t i = 0; i < delegates.size(); i++)
-    {
-        name &delegate = delegates[i];
-
-        ASSERT_SUCCESS(worker.push_action(delegate, N(votepropos), mvo()
-            ("proposal_id", proposal_id)
-            ("voter", delegate)
-            ("positive", (i) % 2)));
+    for (size_t i = 0; i < delegates.size(); i++) {
+        auto& delegate = delegates[i];
+        if ((i) % 2) {
+            ASSERT_SUCCESS(worker.push_action(delegate, N(upvtpropos), mvo()
+                ("proposal_id", proposal_id)
+                ("voter", delegate)));
+        } else {
+            ASSERT_SUCCESS(worker.push_action(delegate, N(downvtpropos), mvo()
+                ("proposal_id", proposal_id)
+                ("voter", delegate)));
+        }
     }
 
     BOOST_REQUIRE_EQUAL(worker.get_proposal_votes(worker_code_account).size(), delegates.size());
@@ -584,14 +593,17 @@ try
         add_proposal(proposal_id, proposal_author, tspec_id, tspec_author, worker_account);
 
         // revote for the proposal
-        for (size_t i = 0; i < delegates.size(); i++)
-        {
-            name &delegate = delegates[i];
-
-            ASSERT_SUCCESS(worker.push_action(delegate, N(votepropos), mvo()
-                ("proposal_id", proposal_id)
-                ("voter", delegate)
-                ("positive", (i + 1) % 2)));
+        for (size_t i = 0; i < delegates.size(); i++) {
+            auto& delegate = delegates[i];
+            if ((i + 1) % 2) {
+                ASSERT_SUCCESS(worker.push_action(delegate, N(upvtpropos), mvo()
+                    ("proposal_id", proposal_id)
+                    ("voter", delegate)));
+            } else {
+                ASSERT_SUCCESS(worker.push_action(delegate, N(downvtpropos), mvo()
+                    ("proposal_id", proposal_id)
+                    ("voter", delegate)));
+            }
         }
 
         uint64_t comment_id = (proposal_id + 1) * 1000;

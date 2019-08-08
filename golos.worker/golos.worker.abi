@@ -120,6 +120,20 @@
             ]
         },
         {
+            "name": "votepropos",
+            "base": "",
+            "fields": [
+                {
+                    "name": "proposal_id",
+                    "type": "comment_id_t"
+                },
+                {
+                    "name": "voter",
+                    "type": "name"
+                }
+            ]
+        },
+        {
             "name": "addtspec",
             "base": "",
             "fields": [
@@ -408,24 +422,6 @@
             ]
         },
         {
-            "name": "votepropos",
-            "base": "",
-            "fields": [
-                {
-                    "name": "proposal_id",
-                    "type": "comment_id_t"
-                },
-                {
-                    "name": "voter",
-                    "type": "name"
-                },
-                {
-                    "name": "positive",
-                    "type": "uint8"
-                }
-            ]
-        },
-        {
             "name": "payout",
             "base": "",
             "fields": [
@@ -462,6 +458,22 @@
         {
             "name": "editpropos",
             "type": "editpropos"
+        },
+        {
+            "name": "delpropos",
+            "type": "delpropos"
+        },
+        {
+            "name": "upvtpropos",
+            "type": "votepropos"
+        },
+        {
+            "name": "downvtpropos",
+            "type": "votepropos"
+        },
+        {
+            "name": "unvtpropos",
+            "type": "votepropos"
         },
         {
             "name": "addtspec",
@@ -520,20 +532,12 @@
             "type": "delcomment"
         },
         {
-            "name": "delpropos",
-            "type": "delpropos"
-        },
-        {
             "name": "deltspec",
             "type": "deltspec"
         },
         {
             "name": "editcomment",
             "type": "editcomment"
-        },
-        {
-            "name": "votepropos",
-            "type": "votepropos"
         },
         {
             "name": "payout",
