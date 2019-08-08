@@ -266,7 +266,9 @@ public:
     [[eosio::action]] void addpropos(comment_id_t proposal_id, name author, uint8_t type);
     [[eosio::action]] void editpropos(comment_id_t proposal_id, uint8_t type);
     [[eosio::action]] void delpropos(comment_id_t proposal_id);
-    [[eosio::action]] void votepropos(comment_id_t proposal_id, eosio::name voter, uint8_t positive);
+    [[eosio::action]] void upvtpropos(comment_id_t proposal_id, name voter);
+    [[eosio::action]] void downvtpropos(comment_id_t proposal_id, name voter);
+    [[eosio::action]] void unvtpropos(comment_id_t proposal_id, name voter);
 
     [[eosio::action]] void addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& text);
     [[eosio::action]] void editcomment(comment_id_t comment_id, const string& text);

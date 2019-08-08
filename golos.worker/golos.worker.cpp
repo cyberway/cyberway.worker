@@ -128,13 +128,25 @@ void worker::delpropos(comment_id_t proposal_id) {
     _proposal_votes.erase_all(proposal_id);
 }
 
-void worker::votepropos(comment_id_t proposal_id, eosio::name voter, uint8_t positive) {
-    auto proposal_ptr = _proposals.find(proposal_id);
-    eosio::check(proposal_ptr != _proposals.end(), "proposal has not been found");
+void worker::upvtpropos(comment_id_t proposal_id, name voter) {
+	require_app_member(voter);
+    auto proposal_ptr = get_proposal(proposal_id);
     eosio::check(eosio::current_time_point().sec_since_epoch() <= proposal_ptr->created + voting_time_s, "voting time is over");
-    require_app_member(voter);
+    _proposal_votes.vote(proposal_id, voter, true);
+}
 
-    _proposal_votes.vote(proposal_id, voter, positive != 0);
+void worker::downvtpropos(comment_id_t proposal_id, name voter) {
+	require_app_member(voter);
+    auto proposal_ptr = get_proposal(proposal_id);
+    eosio::check(eosio::current_time_point().sec_since_epoch() <= proposal_ptr->created + voting_time_s, "voting time is over");
+    _proposal_votes.vote(proposal_id, voter, false);
+}
+
+void worker::unvtpropos(comment_id_t proposal_id, name voter) {
+	require_app_member(voter);
+    auto proposal_ptr = get_proposal(proposal_id);
+    eosio::check(eosio::current_time_point().sec_since_epoch() <= proposal_ptr->created + voting_time_s, "voting time is over");
+    _proposal_votes.erase(proposal_id, voter);
 }
 
 void worker::addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& text) {
@@ -495,7 +507,7 @@ void worker::on_transfer(name from, name to, eosio::asset quantity, std::string 
 } // golos
 
 DISPATCH_WITH_TRANSFER(golos::worker, config::token_name, on_transfer, (createpool)
-    (addpropos)(editpropos)(delpropos)(votepropos)
+    (addpropos)(editpropos)(delpropos)(upvtpropos)(downvtpropos)(unvtpropos)
     (addcomment)(editcomment)(delcomment)
     (addtspec)(edittspec)(deltspec)(apprtspec)(dapprtspec)(unapprtspec)
     (startwork)(cancelwork)(acceptwork)(unacceptwork)(apprwork)(dapprwork)(unapprwork)
