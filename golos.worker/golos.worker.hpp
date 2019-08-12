@@ -246,8 +246,8 @@ protected:
     const auto get_proposal(comment_id_t proposal_id);
 
     void deposit(tspec_app_t& tspec_app);
-    void refund(tspec_app_t& tspec_app, eosio::name modifier);
-    void close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal);
+    void refund(tspec_app_t& tspec_app);
+    void close_tspec(const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal);
     void send_tspecstate_event(const tspec_app_t& tspec_app, tspec_app_t::state_t state);
     void send_tspecerase_event(const tspec_app_t& tspec_app);
 public:

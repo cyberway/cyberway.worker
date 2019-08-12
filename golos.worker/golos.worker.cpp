@@ -33,33 +33,33 @@ void worker::deposit(tspec_app_t& tspec_app) {
     eosio::check(budget <= fund.quantity, "insufficient funds");
 
     tspec_app.deposit = budget;
-    _funds.modify(fund, name(), [&](auto &obj) {
+    _funds.modify(fund, same_payer, [&](auto &obj) {
         obj.quantity -= budget;
     });
 }
 
-void worker::refund(tspec_app_t& tspec_app, eosio::name modifier) {
+void worker::refund(tspec_app_t& tspec_app) {
     if (tspec_app.deposit.amount == 0) {
         return;
     }
 
     const auto& fund = _funds.get(tspec_app.fund_name.value);
-    _funds.modify(fund, modifier, [&](auto &obj) {
+    _funds.modify(fund, same_payer, [&](auto &obj) {
         obj.quantity += tspec_app.deposit;
     });
 
     tspec_app.deposit = ZERO_ASSET;
 }
 
-void worker::close_tspec(name payer, const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal) {
+void worker::close_tspec(const tspec_app_t& tspec_app, tspec_app_t::state_t state, const proposal_t& proposal) {
     if (state != tspec_app_t::STATE_PAYMENT_COMPLETE && proposal.state > proposal_t::STATE_TSPEC_APP) {
-        _proposals.modify(proposal, payer, [&](proposal_t& proposal) {
+        _proposals.modify(proposal, same_payer, [&](proposal_t& proposal) {
             proposal.set_state(proposal_t::STATE_TSPEC_APP);
         });
     }
-    _tspecs.modify(tspec_app, payer, [&](tspec_app_t& tspec) {
+    _tspecs.modify(tspec_app, same_payer, [&](tspec_app_t& tspec) {
         tspec.set_state(state);
-        refund(tspec, payer);
+        refund(tspec);
     });
     // TODO: do instead of modify
     if (state == tspec_app_t::STATE_CLOSED_BY_AUTHOR
@@ -255,7 +255,7 @@ void worker::deltspec(comment_id_t tspec_id)
 
     require_app_member(tspec_app.author);
 
-    close_tspec(tspec_app.author, tspec_app, tspec_app_t::STATE_CLOSED_BY_AUTHOR, proposal);
+    close_tspec(tspec_app, tspec_app_t::STATE_CLOSED_BY_AUTHOR, proposal);
 }
 
 void worker::apprtspec(comment_id_t tspec_id, name approver) {
@@ -268,10 +268,10 @@ void worker::apprtspec(comment_id_t tspec_id, name approver) {
         return;
     }
     const auto& proposal = _proposals.get(tspec.foreign_id);
-    _proposals.modify(proposal, approver, [&](auto& p) {
+    _proposals.modify(proposal, same_payer, [&](auto& p) {
         p.set_state(proposal_t::STATE_TSPEC_CHOSE);
     });
-    _tspecs.modify(tspec, approver, [&](auto& tspec) {
+    _tspecs.modify(tspec, same_payer, [&](auto& tspec) {
         if (proposal.type == proposal_t::TYPE_DONE) {
             tspec.set_state(tspec_app_t::STATE_PAYMENT);
             send_tspecstate_event(tspec, tspec_app_t::STATE_PAYMENT);
@@ -298,7 +298,7 @@ void worker::dapprtspec(comment_id_t tspec_id, name approver) {
         return;
     }
     const auto& proposal = _proposals.get(tspec.foreign_id);
-    close_tspec(approver, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
+    close_tspec(tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
     send_tspecstate_event(tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES);
 }
 
@@ -338,7 +338,7 @@ void worker::cancelwork(comment_id_t tspec_id, eosio::name initiator) {
         require_auth(tspec_app.author);
     }
 
-    _tspecs.modify(tspec_app, initiator, [&](auto& tspec) {
+    _tspecs.modify(tspec_app, same_payer, [&](auto& tspec) {
         tspec.set_state(tspec_app_t::STATE_APPROVED);
         tspec.worker = name();
         tspec.work_begining_time = TIMESTAMP_UNDEFINED;
@@ -380,7 +380,7 @@ void worker::apprwork(comment_id_t tspec_id, name approver) {
         return;
     }
     const auto& proposal = _proposals.get(tspec.foreign_id);
-    _tspecs.modify(tspec, approver, [&](auto& tspec) {
+    _tspecs.modify(tspec, same_payer, [&](auto& tspec) {
         if (tspec.deposit.amount == 0 && proposal.type == proposal_t::TYPE_DONE) {
             deposit(tspec);
         }
@@ -404,10 +404,10 @@ void worker::dapprwork(comment_id_t tspec_id, name approver) {
     }
     const auto& proposal = _proposals.get(tspec.foreign_id);
     if (tspec.state == tspec_app_t::STATE_PAYMENT) {
-        close_tspec(approver, tspec, tspec_app_t::STATE_DISAPPROVED_BY_WITNESSES, proposal);
+        close_tspec(tspec, tspec_app_t::STATE_DISAPPROVED_BY_WITNESSES, proposal);
         send_tspecstate_event(tspec, tspec_app_t::STATE_DISAPPROVED_BY_WITNESSES);
     } else {
-        close_tspec(approver, tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
+        close_tspec(tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES, proposal);
         send_tspecstate_event(tspec, tspec_app_t::STATE_CLOSED_BY_WITNESSES);
     }
 }
@@ -494,7 +494,7 @@ void worker::on_transfer(name from, name to, eosio::asset quantity, std::string 
             fund.quantity = quantity;
         });
     } else {
-        _funds.modify(fund_ptr, eosio::same_payer, [&](auto &fund) {
+        _funds.modify(fund_ptr, same_payer, [&](auto &fund) {
             fund.quantity += quantity;
         });
     }
