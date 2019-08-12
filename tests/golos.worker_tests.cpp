@@ -196,36 +196,35 @@ try
     for (uint64_t i = 0; i < 10; i++) {
         const uint64_t proposal_id = i;
         const name& author_account = members[i];
-        return;
+
+        ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
+            ("comment_id", proposal_id)
+            ("author", author_account)
+            ("text", "Proposal #1")));
         ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
             ("proposal_id", proposal_id)
             ("author", author_account)
-            ("title", "Proposal #1")
-            ("description", "Description #1")
             ("type", static_cast<uint8_t>(TYPE_TASK))));
-        return;
         auto proposal_row = worker.get_proposal(proposal_id);
-        BOOST_REQUIRE_EQUAL(proposal_row["state"], STATE_TSPEC_APP);
-        BOOST_REQUIRE_EQUAL(proposal_row["title"], "Proposal #1");
-        BOOST_REQUIRE_EQUAL(proposal_row["description"], "Description #1");
+        BOOST_REQUIRE_EQUAL(proposal_row["id"], proposal_id);
+        BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_TASK);
         BOOST_REQUIRE_EQUAL(proposal_row["author"], author_account.to_string());
+        BOOST_REQUIRE_EQUAL(proposal_row["state"], STATE_TSPEC_APP);
 
         ASSERT_SUCCESS(worker.push_action(author_account, N(editpropos), mvo()
             ("proposal_id", proposal_id)
-            ("title", "New Proposal #1")
-            ("description", "")));
-
-        BOOST_REQUIRE_EQUAL(worker.push_action(author_account, N(editpropos), mvo()
-            ("proposal_id", proposal_id)
-            ("title", "")
-            ("description", "")), wasm_assert_msg("invalid arguments"));
-
+            ("type", static_cast<uint8_t>(TYPE_DONE))));
         proposal_row = worker.get_proposal(proposal_id);
-        BOOST_REQUIRE_EQUAL(proposal_row["title"], "New Proposal #1");
+        BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_DONE);
+
+        ASSERT_SUCCESS(worker.push_action(author_account, N(editpropos), mvo()
+            ("proposal_id", proposal_id)
+            ("type", static_cast<uint8_t>(TYPE_TASK))));
+        proposal_row = worker.get_proposal(proposal_id);
+        BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_TASK);
 
         ASSERT_SUCCESS(worker.push_action(author_account, N(delpropos), mvo()
             ("proposal_id", proposal_id)));
-
         proposal_row = worker.get_proposal(proposal_id);
         BOOST_REQUIRE(proposal_row.is_null());
     }
