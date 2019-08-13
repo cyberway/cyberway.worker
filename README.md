@@ -25,5 +25,5 @@ cd ..
 
 Test:
 ```sh
-build/tests/unit_test -l message -r detailed --run_test=golos_worker_tests/*
+build/tests/unit_test -l message -r detailed --run_test=cyber_worker_tests/*
 ```

@@ -43,7 +43,7 @@ using namespace std;
     eosio::check(tspec_index.find(PROPOSAL.id) == tspec_index.end(), "proposal has tspecs");\
 }
 
-namespace golos
+namespace cyber
 {
 class [[eosio::contract]] worker : public contract
 {
@@ -295,4 +295,4 @@ public:
 
     void on_transfer(name from, name to, eosio::asset quantity, std::string memo);
 };
-} // namespace golos
+} // namespace cyber

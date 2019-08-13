@@ -1,5 +1,5 @@
 #include "golos_tester.hpp"
-#include "golos.worker_test_api.hpp"
+#include "cyber.worker_test_api.hpp"
 #include "cyber.token_test_api.hpp"
 #include <boost/test/unit_test.hpp>
 #include <boost/format.hpp>
@@ -24,7 +24,7 @@ using mvo = fc::mutable_variant_object;
 
 #define ASSERT_SUCCESS(action) BOOST_REQUIRE_EQUAL((action), success())
 
-const name worker_code_account = name("golos.worker");
+const name worker_code_account = name("cyber.worker");
 const asset app_token_supply = asset::from_string("1000000.000 APP");
 const asset app_fund_supply = asset::from_string("100.000 APP");
 const asset initial_user_supply = asset::from_string("10.000 APP");
@@ -56,15 +56,15 @@ enum tspec_state_t {
     STATE_CLOSED_BY_WITNESSES
 };
 
-class golos_worker_tester : public golos_tester {
+class cyber_worker_tester : public golos_tester {
 protected:
     symbol _sym;
-    golos_worker_api worker;
+    cyber_worker_api worker;
     cyber_token_api token;
     vector<name> delegates;
     vector<name> members;
 public:
-    golos_worker_tester() 
+    cyber_worker_tester() 
         : golos_tester(worker_code_account, false),
         _sym(3, "APP"),
         worker(this, worker_code_account),
@@ -99,7 +99,7 @@ public:
 
         ASSERT_SUCCESS(worker.push_action(_code, N(createpool), mvo()("token_symbol", app_token_supply.get_symbol())));
             produce_blocks();
-        // add some funds to golos.worker contract
+        // add some funds to cyber.worker contract
         ASSERT_SUCCESS(token.issue(cfg::token_name, _code, app_fund_supply, _code.to_string()));
         ASSERT_SUCCESS(token.open(_code, app_fund_supply.get_symbol(), _code));
         produce_blocks();
@@ -186,9 +186,9 @@ public:
     abi_serializer abi_ser;
 };
 
-BOOST_AUTO_TEST_SUITE(golos_worker_tests)
+BOOST_AUTO_TEST_SUITE(cyber_worker_tests)
 
-BOOST_FIXTURE_TEST_CASE(proposal_CUD, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(proposal_CUD, cyber_worker_tester)
 try
 {
     BOOST_TEST_MESSAGE("Testing: proposal_CUD");
@@ -231,7 +231,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(comment_CUD, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(comment_CUD, cyber_worker_tester)
 try
 {
     BOOST_TEST_MESSAGE("Testing: comment_CUD");
@@ -336,7 +336,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(vote_CUD, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(vote_CUD, cyber_worker_tester)
 try
 {
     BOOST_TEST_MESSAGE("Testing: vote_CUD");
@@ -419,7 +419,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(tspec_application_CUD, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(tspec_application_CUD, cyber_worker_tester)
 try
 {
     BOOST_TEST_MESSAGE("Testing: tspec_application_CUD");
@@ -504,7 +504,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(proposal_removal, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(proposal_removal, cyber_worker_tester)
 try
 {
     BOOST_TEST_MESSAGE("Testing: proposal_removal");
@@ -577,7 +577,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(application_fund, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(application_fund, cyber_worker_tester)
 try
 {
     BOOST_TEST_MESSAGE("Testing: application_fund");
@@ -643,7 +643,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(done_proposal, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(done_proposal, cyber_worker_tester)
 try
 {
     BOOST_TEST_MESSAGE("Testing: done_proposal");
@@ -703,7 +703,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(cancel_work_by_worker, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(cancel_work_by_worker, cyber_worker_tester)
 try
 {
     BOOST_TEST_MESSAGE("Testing: cancel_work_by_worker");
@@ -731,7 +731,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(cancel_work_by_tspec_author, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(cancel_work_by_tspec_author, cyber_worker_tester)
 try
 {
     BOOST_TEST_MESSAGE("Testing: cancel_work_by_tspec_author");
@@ -759,7 +759,7 @@ try
 }
 FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(close_tspec_by_delegates, golos_worker_tester)
+BOOST_FIXTURE_TEST_CASE(close_tspec_by_delegates, cyber_worker_tester)
 try
 {
     BOOST_TEST_MESSAGE("Testing: close_tspec_by_delegates");

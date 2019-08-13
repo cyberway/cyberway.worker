@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 
 if (NOT DEFINED PROJECT_NAME)
-    project(golos_worker_contract VERSION 0.1.0)
+    project(cyber_worker_contract VERSION 0.1.0)
 endif(NOT DEFINED PROJECT_NAME)
 
 set(EOSIO_CDT_VERSION_MIN "1.6")
@@ -63,7 +63,7 @@ macro(add_contract_with_abi TARGET ABIFILE)
    install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.abi DESTINATION ${CMAKE_INSTALL_PREFIX}/${TARGET}/)
 endmacro()
 
-add_subdirectory(golos.worker)
+add_subdirectory(cyber.worker)
 
 if (APPLE)
    set(OPENSSL_ROOT "/usr/local/opt/openssl")

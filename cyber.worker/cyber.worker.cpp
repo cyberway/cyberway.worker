@@ -1,20 +1,19 @@
-#include "golos.worker.hpp"
+#include "cyber.worker.hpp"
 #include <eosio/event.hpp>
 #include <eosio/transaction.hpp>
 
-namespace config = golos::config;
+namespace config = cyber::config;
 
-namespace golos
+namespace cyber
 {
 
 void worker::require_app_member(eosio::name account) {
     require_auth(account);
-    //TODO: eosio::check(golos.vest::get_balance(account, _app).amount > 0, "app domain member authority is required to do this action");
 }
 
 void worker::require_app_delegate(eosio::name account) {
     require_auth(account);
-    //TODO: eosio::check(golos.ctrl::is_witness(account, _app), "app domain delegate authority is required to do this action");
+    //TODO: remove
 }
 
 auto worker::get_state() {
@@ -504,9 +503,9 @@ void worker::on_transfer(name from, name to, eosio::asset quantity, std::string 
     LOG("added % credits to % fund", quantity, memo.c_str());
 }
 
-} // golos
+} // cyber
 
-DISPATCH_WITH_TRANSFER(golos::worker, config::token_name, on_transfer, (createpool)
+DISPATCH_WITH_TRANSFER(cyber::worker, config::token_name, on_transfer, (createpool)
     (addpropos)(editpropos)(delpropos)(upvtpropos)(downvtpropos)(unvtpropos)
     (addcomment)(editcomment)(delcomment)
     (addtspec)(edittspec)(deltspec)(apprtspec)(dapprtspec)(unapprtspec)
