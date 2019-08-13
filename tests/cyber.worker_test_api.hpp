@@ -4,8 +4,8 @@
 
 namespace eosio { namespace testing {
 
-struct golos_worker_api: base_contract_api {
-    golos_worker_api(golos_tester* tester, name code)
+struct cyber_worker_api: base_contract_api {
+    cyber_worker_api(golos_tester* tester, name code)
     :   base_contract_api(tester, code) {
     }
 

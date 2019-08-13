@@ -1,6 +1,6 @@
 #! /bin/bash
 
-printf "\t=========== Building golos worker contract ===========\n\n"
+printf "\t=========== Building cyber worker contract ===========\n\n"
 
 RED='\033[0;31m'
 NC='\033[0m'

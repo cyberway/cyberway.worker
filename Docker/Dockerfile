@@ -56,4 +56,4 @@ RUN ldconfig && ln -s ../cyberway.contracts /opt/cyberway.worker/cyberway.contra
 
 ENV CYBERWAY_TEST_CONTRACTS /opt/cyberway.contracts/test_contracts/
 ENV CYBERWAY_CONTRACTS /opt/cyberway.contracts/
-ENV GOLOS_CONTRACTS /opt/cyberway.worker/
+ENV WORKER_CONTRACTS /opt/cyberway.worker/
