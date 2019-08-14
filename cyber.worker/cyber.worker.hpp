@@ -35,8 +35,7 @@ using namespace std;
 
 #define CHECK_APPROVE_TSPEC(TSPEC, APPROVER) \
     require_app_delegate(approver); \
-    eosio::check(TSPEC.state == tspec_app_t::STATE_CREATED, "invalid state"); \
-    eosio::check(current_time_point().sec_since_epoch() <= TSPEC.created + voting_time_s, "approve time is over");
+    eosio::check(TSPEC.state == tspec_app_t::STATE_CREATED, "invalid state");
 
 #define CHECK_PROPOSAL_NO_TSPECS(PROPOSAL) {\
     auto tspec_index = _tspecs.get_index<"foreign"_n>();\
@@ -174,16 +173,12 @@ public:
         eosio::name fund_name;
         asset deposit;
         eosio::name worker;
-        uint64_t work_begining_time;
         std::optional<comment_id_t> result_comment_id;
         uint8_t worker_payments_count;
         uint64_t next_payout;
-        uint64_t created;
-        uint64_t modified;
 
         EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(state)(data)(fund_name)(deposit)(worker)
-            (work_begining_time)(result_comment_id)(worker_payments_count)(next_payout)
-            (created)(modified))
+            (result_comment_id)(worker_payments_count)(next_payout))
 
         uint64_t primary_key() const { return id; }
         uint64_t foreign_key() const { return foreign_id; }
@@ -212,8 +207,6 @@ public:
         eosio::name author;
         uint8_t type;
         uint8_t state;
-        uint64_t created;
-        uint64_t modified;
 
         uint64_t primary_key() const { return id; }
         void set_state(state_t new_state) { state = new_state; }
