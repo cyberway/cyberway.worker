@@ -203,6 +203,13 @@ void worker::addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t pr
         worker = name();
     }
 
+    auto payments_period = int64_t(tspec.payments_interval) * tspec.payments_count;
+    uint128_t cost(tspec.development_cost.amount);
+    cost += tspec.specification_cost.amount;
+    cost *= eosio::days(1).to_seconds();
+    cost /= payments_period;
+    asset consumption(static_cast<uint64_t>(cost), tspec.specification_cost.symbol);
+
     _tspecs.emplace(author, [&](auto& o) {
         o.id = tspec_id;
         o.author = author;
