@@ -188,6 +188,234 @@ public:
 
 BOOST_AUTO_TEST_SUITE(cyber_worker_tests)
 
+BOOST_AUTO_TEST_SUITE(comment_tests)
+
+BOOST_FIXTURE_TEST_CASE(comment_create, cyber_worker_tester) try {
+    BOOST_TEST_MESSAGE("Testing: comment_create");
+
+    auto comment_author = members[0];
+
+    BOOST_TEST_MESSAGE("-- wrong auth");
+    BOOST_REQUIRE_EQUAL("missing authority of " + comment_author.to_string(), worker.push_action(members[1], N(addcomment), mvo()
+        ("comment_id", 0)
+        ("author", comment_author)
+        ("text", "Some text")));
+
+    BOOST_TEST_MESSAGE("-- empty text");
+    BOOST_REQUIRE_EQUAL(wasm_assert_msg("comment cannot be empty"), worker.push_action(comment_author, N(addcomment), mvo()
+        ("comment_id", 0)
+        ("author", comment_author)
+        ("text", "")));
+
+    BOOST_TEST_MESSAGE("-- wrong parent id");
+    BOOST_REQUIRE_EQUAL(wasm_assert_msg("parent comment not exists"), worker.push_action(comment_author, N(addcomment), mvo()
+        ("comment_id", 0)
+        ("author", comment_author)
+        ("parent_id", 100500)
+        ("text", "Some text")));
+
+    BOOST_TEST_MESSAGE("-- normal case with post");
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
+        ("comment_id", 0)
+        ("author", comment_author)
+        ("text", "Post")));
+
+    BOOST_TEST_MESSAGE("-- normal case with comment");
+    ASSERT_SUCCESS(worker.push_action(members[1], N(addcomment), mvo()
+        ("comment_id", 1)
+        ("author", members[1])
+        ("parent_id", 0)
+        ("text", "Comment")));
+
+    BOOST_TEST_MESSAGE("-- duplicate same id");
+    BOOST_REQUIRE_EQUAL(wasm_assert_msg("already exists"), worker.push_action(comment_author, N(addcomment), mvo()
+        ("comment_id", 0)
+        ("author", comment_author)
+        ("text", "Duplicate post")));
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(comment_update, cyber_worker_tester) try {
+    BOOST_TEST_MESSAGE("Testing: comment_update");
+
+    auto comment_author = members[0];
+
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
+        ("comment_id", 0)
+        ("author", comment_author)
+        ("text", "Post")));
+
+    BOOST_TEST_MESSAGE("-- empty text");
+    BOOST_REQUIRE_EQUAL(wasm_assert_msg("comment cannot be empty"), worker.push_action(comment_author, N(editcomment), mvo()
+        ("comment_id", 0)
+        ("author", comment_author)
+        ("text", "")));
+
+    BOOST_TEST_MESSAGE("-- wrong auth");
+    BOOST_REQUIRE_EQUAL("missing authority of " + comment_author.to_string(), worker.push_action(members[1], N(editcomment), mvo()
+        ("comment_id", 0)
+        ("author", comment_author)
+        ("text", "Some text")));
+
+    BOOST_TEST_MESSAGE("-- not-exist");
+    BOOST_REQUIRE_EQUAL(wasm_assert_msg("unable to find key"), worker.push_action(comment_author, N(editcomment), mvo()
+        ("comment_id", 1)
+        ("author", comment_author)
+        ("text", "Some text")));
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(comment_delete, cyber_worker_tester) try {
+    BOOST_TEST_MESSAGE("Testing: comment_delete");
+
+    auto comment_author = members[0];
+
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
+        ("comment_id", 0)
+        ("author", comment_author)
+        ("text", "Post")));
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
+        ("comment_id", 1)
+        ("author", comment_author)
+        ("parent_id", 0)
+        ("text", "Comment")));
+
+    BOOST_TEST_MESSAGE("-- not-exist");
+    BOOST_REQUIRE_EQUAL(wasm_assert_msg("unable to find key"), worker.push_action(comment_author, N(delcomment), mvo()
+        ("comment_id", 2)));
+
+    BOOST_TEST_MESSAGE("-- wrong auth");
+    BOOST_REQUIRE_EQUAL("missing authority of " + comment_author.to_string(), worker.push_action(members[1], N(delcomment), mvo()
+        ("comment_id", 0)));
+
+    BOOST_TEST_MESSAGE("-- with child");
+    BOOST_REQUIRE_EQUAL(wasm_assert_msg("comment has child comments"), worker.push_action(comment_author, N(delcomment), mvo()
+        ("comment_id", 0)));
+
+    BOOST_TEST_MESSAGE("-- normal case - delete child");
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(delcomment), mvo()
+        ("comment_id", 1)));
+
+    BOOST_TEST_MESSAGE("-- with proposal");
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(addpropos), mvo()
+        ("proposal_id", 0)
+        ("author", comment_author)
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
+    BOOST_REQUIRE_EQUAL(wasm_assert_msg("comment has proposal"), worker.push_action(comment_author, N(delcomment), mvo()
+        ("comment_id", 0)));
+
+    BOOST_TEST_MESSAGE("-- with tspec");
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
+        ("comment_id", 3)
+        ("author", comment_author)
+        ("text", "Technical specification #1")));
+    auto tspec_app = mvo()
+        ("tspec_id", 3)
+        ("author", comment_author)
+        ("proposal_id", 0)
+        ("tspec", mvo()
+            ("specification_cost", "1.000 APP")
+            ("development_cost", "1.000 APP")
+            ("payments_count", 1)
+            ("payments_interval", 1))
+        ("worker", comment_author);
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(addtspec), tspec_app));
+    BOOST_REQUIRE_EQUAL(wasm_assert_msg("comment has tspec"), worker.push_action(comment_author, N(delcomment), mvo()
+        ("comment_id", 3)));
+
+    BOOST_TEST_MESSAGE("-- with result");
+    for (size_t i = 0; i < delegates_51; i++) {
+        const auto& delegate = delegates[i];
+        ASSERT_SUCCESS(worker.push_action(delegate, N(apprtspec), mvo()
+            ("tspec_id", 3)
+            ("approver", delegate.to_string())));
+    }
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
+        ("comment_id", 4)
+        ("author", comment_author)
+        ("text", "Result #1")));
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(acceptwork), mvo()
+        ("tspec_id", 3)
+        ("result_comment_id", 4)));
+    BOOST_REQUIRE_EQUAL(wasm_assert_msg("comment used as result for tspec"), worker.push_action(comment_author, N(delcomment), mvo()
+        ("comment_id", 4)));
+
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(unacceptwork), mvo()
+        ("tspec_id", 3)));
+
+    BOOST_TEST_MESSAGE("-- normal case - delete post");
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(delcomment), mvo()
+        ("comment_id", 4)));
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(comment_CUD, cyber_worker_tester)
+try
+{
+    BOOST_TEST_MESSAGE("Testing: comment_CUD");
+
+    uint64_t comment_id = 0;
+    auto comment_author = members[comment_id];
+
+    BOOST_TEST_MESSAGE("-- Adding root post");
+
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
+        ("comment_id", comment_id)
+        ("author", comment_author)
+        ("text", "Root post")));
+
+    BOOST_REQUIRE_EQUAL(worker.get_comment(comment_id)["author"], comment_author.to_string());
+
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(editcomment), mvo()
+        ("comment_id", comment_id)
+        ("text", "Fine!")));
+
+    BOOST_TEST_MESSAGE("-- Adding child comments");
+
+    constexpr uint64_t comments_count = 10;
+
+    for (comment_id = 1; comment_id <= comments_count; comment_id++) {
+        comment_author = members[comment_id];
+
+        ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
+            ("comment_id", comment_id)
+            ("author", comment_author)
+            ("parent_id", comment_id-1)
+            ("text", "I am comment")));
+    }
+
+    // check comment count is equal to comments_count+1 after creating comments
+    BOOST_REQUIRE_EQUAL(worker.get_comments().size(), comments_count+1);
+
+    BOOST_TEST_MESSAGE("-- Deleting child comments");
+
+    for (comment_id = comments_count; comment_id >= 1; comment_id--) {
+        const name& comment_author = members[comment_id];
+
+        ASSERT_SUCCESS(worker.push_action(comment_author, N(delcomment), mvo()
+            ("comment_id", comment_id)));
+
+        BOOST_REQUIRE(worker.get_comment(comment_id).is_null());
+    }
+
+    // check comment count value is equal to 1 after deleting comments
+    BOOST_REQUIRE_EQUAL(worker.get_comments().size(), 1);
+
+    BOOST_TEST_MESSAGE("-- Deleting root post");
+
+    comment_id = 0;
+    comment_author = members[comment_id];
+
+    ASSERT_SUCCESS(worker.push_action(comment_author, N(delcomment), mvo()
+        ("comment_id", comment_id)));
+
+    BOOST_REQUIRE(worker.get_comment(comment_id).is_null());
+
+    // check comment count value is zero now
+    BOOST_REQUIRE_EQUAL(worker.get_comments().size(), 0);
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_AUTO_TEST_SUITE_END() // comment_tests
+
 BOOST_FIXTURE_TEST_CASE(proposal_CUD, cyber_worker_tester)
 try
 {
@@ -228,111 +456,6 @@ try
         proposal_row = worker.get_proposal(proposal_id);
         BOOST_REQUIRE(proposal_row.is_null());
     }
-}
-FC_LOG_AND_RETHROW()
-
-BOOST_FIXTURE_TEST_CASE(comment_CUD, cyber_worker_tester)
-try
-{
-    BOOST_TEST_MESSAGE("Testing: comment_CUD");
-
-    uint64_t comment_id = 0;
-    auto comment_author = members[comment_id];
-
-    BOOST_TEST_MESSAGE("-- Adding root post");
-
-    // ensure fail when adding comment below not-exist root comment
-    BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(addcomment), mvo()
-        ("comment_id", comment_id)
-        ("author", comment_author)
-        ("parent_id", 100500)
-        ("text", "Fake parent id")), wasm_assert_msg("parent comment not exists"));
-
-    // ensure fail when adding comment with empty text
-    BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(addcomment), mvo()
-        ("comment_id", comment_id)
-        ("author", comment_author)
-        ("text", "")), wasm_assert_msg("comment cannot be empty"));
-
-    // normal case
-    ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
-        ("comment_id", comment_id)
-        ("author", comment_author)
-        ("text", "Root post")));
-
-    // ensure fail when adding comment with same id
-    BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(addcomment), mvo()
-        ("comment_id", comment_id)
-        ("author", comment_author)
-        ("text", "Duplicate comment")), wasm_assert_msg("already exists"));
-
-    BOOST_REQUIRE_EQUAL(worker.get_comment(comment_id)["author"], comment_author.to_string());
-
-    ASSERT_SUCCESS(worker.push_action(comment_author, N(editcomment), mvo()
-        ("comment_id", comment_id)
-        ("text", "Fine!")));
-
-    // ensure fail when editing comment with empty text
-    BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(editcomment), mvo()
-        ("comment_id", comment_id)
-        ("text", "")), wasm_assert_msg("comment cannot be empty"));
-
-    BOOST_TEST_MESSAGE("-- Adding child comments");
-
-    constexpr uint64_t comments_count = 10;
-
-    for (comment_id = 1; comment_id <= comments_count; comment_id++) {
-        comment_author = members[comment_id];
-
-        ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
-            ("comment_id", comment_id)
-            ("author", comment_author)
-            ("parent_id", comment_id-1)
-            ("text", "I am comment")));
-    }
-
-    // check comment count is equal to comments_count+1 after creating comments
-    BOOST_REQUIRE_EQUAL(worker.get_comments().size(), comments_count+1);
-
-    BOOST_TEST_MESSAGE("-- Deleting child comments");
-
-    for (comment_id = comments_count; comment_id >= 1; comment_id--) {
-        const name& comment_author = members[comment_id];
-
-        // ensure fail when deleting comment with child
-        BOOST_REQUIRE_EQUAL(worker.push_action(members[comment_id-1], N(delcomment), mvo()
-            ("comment_id", comment_id-1)), wasm_assert_msg("comment has child comments"));
-
-        ASSERT_SUCCESS(worker.push_action(comment_author, N(delcomment), mvo()
-            ("comment_id", comment_id)));
-
-        BOOST_REQUIRE(worker.get_comment(comment_id).is_null());
-
-        // ensure fail when deleting non-existing comment
-        BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(delcomment), mvo()
-            ("comment_id", comment_id)), wasm_assert_msg("unable to find key"));
-
-        // ensure fail when editing non-existing comment
-        BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(editcomment), mvo()
-            ("comment_id", comment_id)
-            ("text", "Deleted")), wasm_assert_msg("unable to find key"));
-    }
-
-    // check comment count value is equal to 1 after deleting comments
-    BOOST_REQUIRE_EQUAL(worker.get_comments().size(), 1);
-
-    BOOST_TEST_MESSAGE("-- Deleting root post");
-
-    comment_id = 0;
-    comment_author = members[comment_id];
-
-    ASSERT_SUCCESS(worker.push_action(comment_author, N(delcomment), mvo()
-        ("comment_id", comment_id)));
-
-    BOOST_REQUIRE(worker.get_comment(comment_id).is_null());
-
-    // check comment count value is zero now
-    BOOST_REQUIRE_EQUAL(worker.get_comments().size(), 0);
 }
 FC_LOG_AND_RETHROW()
 
