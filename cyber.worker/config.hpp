@@ -12,4 +12,6 @@ constexpr unsigned payout_expiration_sec  = 3*60*60;
 constexpr unsigned payout_sender_id = 1;
 constexpr size_t max_payed_tspecs_per_action = 10;
 
+const uint16_t max_comment_title_length = 256;
+const char* err_too_long_title = "title is longer than 256";
 }} // cyber::config

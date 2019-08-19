@@ -148,9 +148,10 @@ void worker::unvtpropos(comment_id_t proposal_id, name voter) {
     _proposal_votes.erase(proposal_id, voter);
 }
 
-void worker::addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& text) {
+void worker::addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& title, const string& body) {
     require_auth(author);
-    eosio::check(!text.empty(), "comment cannot be empty");
+    eosio::check(title.length() <= config::max_comment_title_length, config::err_too_long_title);
+    eosio::check(!body.empty(), "body cannot be empty");
     eosio::check(_comments.find(comment_id) == _comments.end(), "already exists");
     eosio::check(!parent_id || _comments.find(*parent_id) != _comments.end(), "parent comment not exists");
     _comments.emplace(author, [&](auto &obj) {
@@ -160,8 +161,9 @@ void worker::addcomment(comment_id_t comment_id, eosio::name author, std::option
     });
 }
 
-void worker::editcomment(comment_id_t comment_id, const string& text) {
-    eosio::check(!text.empty(), "comment cannot be empty");
+void worker::editcomment(comment_id_t comment_id, const string& title, const string& body) {
+    eosio::check(title.length() <= config::max_comment_title_length, config::err_too_long_title);
+    eosio::check(!body.empty(), "body cannot be empty");
     const auto& comment = _comments.get(comment_id);
     require_auth(comment.author);
 }

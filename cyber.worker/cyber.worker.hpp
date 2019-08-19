@@ -270,8 +270,8 @@ public:
     [[eosio::action]] void downvtpropos(comment_id_t proposal_id, name voter);
     [[eosio::action]] void unvtpropos(comment_id_t proposal_id, name voter);
 
-    [[eosio::action]] void addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& text);
-    [[eosio::action]] void editcomment(comment_id_t comment_id, const string& text);
+    [[eosio::action]] void addcomment(comment_id_t comment_id, eosio::name author, std::optional<comment_id_t> parent_id, const string& title, const string& body);
+    [[eosio::action]] void editcomment(comment_id_t comment_id, const string& title, const string& body);
     [[eosio::action]] void delcomment(comment_id_t comment_id);
 
     [[eosio::action]] void addtspec(comment_id_t tspec_id, eosio::name author, comment_id_t proposal_id, const tspec_data_t& tspec, std::optional<name> worker);

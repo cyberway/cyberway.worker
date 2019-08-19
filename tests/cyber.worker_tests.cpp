@@ -114,7 +114,8 @@ public:
         ASSERT_SUCCESS(worker.push_action(proposal_author, N(addcomment), mvo()
             ("comment_id", proposal_id)
             ("author", proposal_author)
-            ("text", long_text)));
+            ("title", "Lorem ipsum")
+            ("body", long_text)));
         ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
             ("proposal_id", proposal_id)
             ("author", proposal_author)
@@ -129,7 +130,8 @@ public:
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
             ("comment_id", tspec_app_id)
             ("author", tspec_author)
-            ("text", "Technical specification #1")));
+            ("title", "Lorem ipsum")
+            ("body", "Technical specification #1")));
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addtspec), mvo()
             ("tspec_id", tspec_app_id)
             ("author", tspec_author)
@@ -145,7 +147,8 @@ public:
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
             ("comment_id", other_tspec_app_id)
             ("author", tspec_author)
-            ("text", "Technical specification #2")));
+            ("title", "Lorem ipsum")
+            ("body", "Technical specification #2")));
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addtspec), mvo()
             ("tspec_id", other_tspec_app_id)
             ("author", tspec_author)
@@ -200,7 +203,8 @@ try
         ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
             ("comment_id", proposal_id)
             ("author", author_account)
-            ("text", "Proposal #1")));
+            ("title", "Lorem ipsum")
+            ("body", "Proposal #1")));
         ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
             ("proposal_id", proposal_id)
             ("author", author_account)
@@ -246,36 +250,42 @@ try
         ("comment_id", comment_id)
         ("author", comment_author)
         ("parent_id", 100500)
-        ("text", "Fake parent id")), wasm_assert_msg("parent comment not exists"));
+        ("title", "Lorem ipsum")
+        ("body", "Fake parent id")), wasm_assert_msg("parent comment not exists"));
 
     // ensure fail when adding comment with empty text
     BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(addcomment), mvo()
         ("comment_id", comment_id)
         ("author", comment_author)
-        ("text", "")), wasm_assert_msg("comment cannot be empty"));
+        ("title", "Lorem ipsum")
+        ("body", "")), wasm_assert_msg("body cannot be empty"));
 
     // normal case
     ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
         ("comment_id", comment_id)
         ("author", comment_author)
-        ("text", "Root post")));
+        ("title", "Lorem ipsum")
+        ("body", "Root post")));
 
     // ensure fail when adding comment with same id
     BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(addcomment), mvo()
         ("comment_id", comment_id)
         ("author", comment_author)
-        ("text", "Duplicate comment")), wasm_assert_msg("already exists"));
+        ("title", "Lorem ipsum")
+        ("body", "Duplicate comment")), wasm_assert_msg("already exists"));
 
     BOOST_REQUIRE_EQUAL(worker.get_comment(comment_id)["author"], comment_author.to_string());
 
     ASSERT_SUCCESS(worker.push_action(comment_author, N(editcomment), mvo()
         ("comment_id", comment_id)
-        ("text", "Fine!")));
+        ("title", "Lorem ipsum")
+        ("body", "Fine!")));
 
     // ensure fail when editing comment with empty text
     BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(editcomment), mvo()
         ("comment_id", comment_id)
-        ("text", "")), wasm_assert_msg("comment cannot be empty"));
+        ("title", "Lorem ipsum")
+        ("body", "")), wasm_assert_msg("body cannot be empty"));
 
     BOOST_TEST_MESSAGE("-- Adding child comments");
 
@@ -288,7 +298,8 @@ try
             ("comment_id", comment_id)
             ("author", comment_author)
             ("parent_id", comment_id-1)
-            ("text", "I am comment")));
+            ("title", "Lorem ipsum")
+            ("body", "I am comment")));
     }
 
     // check comment count is equal to comments_count+1 after creating comments
@@ -315,7 +326,8 @@ try
         // ensure fail when editing non-existing comment
         BOOST_REQUIRE_EQUAL(worker.push_action(comment_author, N(editcomment), mvo()
             ("comment_id", comment_id)
-            ("text", "Deleted")), wasm_assert_msg("unable to find key"));
+            ("title", "Lorem ipsum")
+            ("body", "Deleted")), wasm_assert_msg("unable to find key"));
     }
 
     // check comment count value is equal to 1 after deleting comments
@@ -346,7 +358,8 @@ try
     ASSERT_SUCCESS(worker.push_action(members[0], N(addcomment), mvo()
         ("comment_id", proposal_id)
         ("author", members[0])
-        ("text", "Proposal #1")));
+        ("title", "Lorem ipsum")
+        ("body", "Proposal #1")));
     ASSERT_SUCCESS(worker.push_action(members[0], N(addpropos), mvo()
         ("proposal_id", proposal_id)
         ("author", members[0])
@@ -434,7 +447,8 @@ try
         ASSERT_SUCCESS(worker.push_action(proposal_author, N(addcomment), mvo()
             ("comment_id", proposal_id)
             ("author", proposal_author)
-            ("text", "Proposal #1")));
+            ("title", "Lorem ipsum")
+            ("body", "Proposal #1")));
         ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
             ("proposal_id", proposal_id)
             ("author", proposal_author)
@@ -449,7 +463,8 @@ try
             ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
                 ("comment_id", tspec_app_id)
                 ("author", tspec_author)
-                ("text", "Technical specification #1")));
+                ("title", "Lorem ipsum")
+            ("body", "Technical specification #1")));
             auto tspec_app = mvo()
                 ("tspec_id", tspec_app_id)
                 ("author", tspec_author)
@@ -518,7 +533,8 @@ try
     ASSERT_SUCCESS(worker.push_action(proposal_author, N(addcomment), mvo()
         ("comment_id", proposal_id)
         ("author", proposal_author)
-        ("text", "Proposal #1")));
+        ("title", "Lorem ipsum")
+        ("body", "Proposal #1")));
     ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
         ("proposal_id", proposal_id)
         ("author", proposal_author)
@@ -537,12 +553,14 @@ try
             ("comment_id", comment_id)
             ("author", comment_author)
             ("parent_id", proposal_id)
-            ("text", "Awesome!")));
+            ("title", "Lorem ipsum")
+            ("body", "Awesome!")));
 
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
             ("comment_id", tspec_app_id)
             ("author", tspec_author)
-            ("text", "Awesome!")));
+            ("title", "Lorem ipsum")
+            ("body", "Awesome!")));
         auto tspec_app = mvo()
             ("tspec_id", tspec_app_id)
             ("author", tspec_author)
@@ -609,7 +627,8 @@ try
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
             ("comment_id", comment_id)
             ("author", tspec_author)
-            ("text", "Work done!")));
+            ("title", "Lorem ipsum")
+            ("body", "Work done!")));
         ASSERT_SUCCESS(worker.push_action(tspec_author, N(acceptwork), mvo()
             ("tspec_id", tspec_id)
             ("result_comment_id", comment_id)));
@@ -657,7 +676,8 @@ try
     ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
         ("comment_id", proposal_id)
         ("author", author_account)
-        ("text", "Sponsored proposal #1")));
+        ("title", "Lorem ipsum")
+        ("body", "Sponsored proposal #1")));
     ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
         ("proposal_id", proposal_id)
         ("author", author_account)
@@ -666,7 +686,8 @@ try
     ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
         ("comment_id", tspec_id)
         ("author", author_account)
-        ("text", "Technical specification #1")));
+        ("title", "Lorem ipsum")
+        ("body", "Technical specification #1")));
     ASSERT_SUCCESS(worker.push_action(author_account, N(addtspec), mvo()
         ("tspec_id", tspec_id)
         ("author", author_account)
