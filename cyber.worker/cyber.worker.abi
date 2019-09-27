@@ -194,10 +194,6 @@
                 {
                     "name": "tspec_id",
                     "type": "comment_id_t"
-                },
-                {
-                    "name": "approver",
-                    "type": "name"
                 }
             ]
         },
@@ -380,28 +376,6 @@
             ]
         },
         {
-            "name": "vote_t",
-            "base": "",
-            "fields": [
-                {
-                    "name": "id",
-                    "type": "uint64"
-                },
-                {
-                    "name": "voter",
-                    "type": "name"
-                },
-                {
-                    "name": "foreign_id",
-                    "type": "uint64"
-                },
-                {
-                    "name": "positive",
-                    "type": "bool"
-                }
-            ]
-        },
-        {
             "name": "payout",
             "base": "",
             "fields": [
@@ -472,10 +446,6 @@
             "type": "approve"
         },
         {
-            "name": "unapprtspec",
-            "type": "approve"
-        },
-        {
             "name": "startwork",
             "type": "startwork"
         },
@@ -497,10 +467,6 @@
         },
         {
             "name": "dapprwork",
-            "type": "approve"
-        },
-        {
-            "name": "unapprwork",
             "type": "approve"
         },
         {
@@ -567,51 +533,12 @@
             }]
         },
         {
-            "name": "proposalsv",
-            "type": "vote_t",
-            "indexes": [{
-                "name": "primary",
-                "unique": true,
-                "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "foreign",
-                "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
-            }]
-        },
-        {
             "name": "state",
             "type": "state_t",
             "indexes": [{
                 "name": "primary",
                 "unique": true,
                 "orders": [{"field": "id", "order": "asc"}]
-            }]
-        },
-        {
-            "name": "tspecv",
-            "type": "vote_t",
-            "indexes": [{
-                "name": "primary",
-                "unique": true,
-                "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "foreign",
-                "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
-            }]
-        },
-        {
-            "name": "tspecrv",
-            "type": "vote_t",
-            "indexes": [{
-                "name": "primary",
-                "unique": true,
-                "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "foreign",
-                "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
             }]
         },
         {

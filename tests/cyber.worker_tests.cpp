@@ -159,14 +159,8 @@ public:
         BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
 
         // vote for the 0 technical specification application
-        for (size_t i = 0; i < delegates_51; i++)
-        {
-            const name &delegate = delegates[i];
-
-            ASSERT_SUCCESS(worker.push_action(delegate, N(apprtspec), mvo()
-                ("tspec_id", tspec_app_id)
-                ("approver", delegate.to_string())));
-        }
+        ASSERT_SUCCESS(worker.push_action(_code, N(apprtspec), mvo()
+            ("tspec_id", tspec_app_id)));
 
         BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
         // if technical specification application was upvoted, `tspec_deposit` should be deposited from the application fund
@@ -352,8 +346,6 @@ try
         ("author", members[0])
         ("type", static_cast<uint8_t>(TYPE_TASK))));
 
-    BOOST_REQUIRE_EQUAL(worker.get_proposal_votes(worker_code_account).size(), 0);
-
     for (size_t i = 0; i < delegates.size(); i++) {
         auto& delegate = delegates[i];
         if ((i + 1) % 2) {
@@ -366,56 +358,6 @@ try
                 ("voter", delegate)));
         }
     }
-
-    BOOST_REQUIRE_EQUAL(worker.get_proposal_votes(worker_code_account).size(), delegates.size());
-
-    // revote with the same `positive` value
-    for (size_t i = 0; i < delegates.size(); i++) {
-        auto& delegate = delegates[i];
-        if ((i + 1) % 2) {
-            BOOST_REQUIRE_EQUAL(worker.push_action(delegate, N(upvtpropos), mvo()
-                ("proposal_id", proposal_id)
-                ("voter", delegate)), wasm_assert_msg("the vote already exists"));
-        } else {
-            BOOST_REQUIRE_EQUAL(worker.push_action(delegate, N(downvtpropos), mvo()
-                ("proposal_id", proposal_id)
-                ("voter", delegate)), wasm_assert_msg("the vote already exists"));
-        }
-    }
-
-    BOOST_REQUIRE_EQUAL(worker.get_proposal_votes(worker_code_account).size(), delegates.size());
-
-    // revote with the different `positive` value
-    for (size_t i = 0; i < delegates.size(); i++) {
-        auto& delegate = delegates[i];
-        if ((i) % 2) {
-            ASSERT_SUCCESS(worker.push_action(delegate, N(upvtpropos), mvo()
-                ("proposal_id", proposal_id)
-                ("voter", delegate)));
-        } else {
-            ASSERT_SUCCESS(worker.push_action(delegate, N(downvtpropos), mvo()
-                ("proposal_id", proposal_id)
-                ("voter", delegate)));
-        }
-    }
-
-    BOOST_REQUIRE_EQUAL(worker.get_proposal_votes(worker_code_account).size(), delegates.size());
-
-    auto votes = worker.get_proposal_votes(worker_code_account);
-    BOOST_REQUIRE_EQUAL(delegates.size(), votes.size());
-    // revote with the different `positive` value
-    for (size_t i = 0; i < delegates.size(); i++)
-    {
-        auto& delegate = delegates[i];
-        auto& vote = votes[i];
-
-        BOOST_REQUIRE_EQUAL(vote["positive"], i % 2);
-    }
-
-    ASSERT_SUCCESS(worker.push_action(members[0], N(delpropos), mvo()
-        ("proposal_id", proposal_id)));
-
-    BOOST_REQUIRE_EQUAL(worker.get_proposal_votes(worker_code_account).size(), 0);
 }
 FC_LOG_AND_RETHROW()
 
@@ -480,15 +422,6 @@ try
             tspec_row = worker.get_tspec(tspec_app_id);
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["specification_cost"].as<asset>().to_string(), "2.000 APP");
             BOOST_REQUIRE_EQUAL(tspec_row["data"]["development_cost"].as<asset>().to_string(), "2.000 APP");
-
-            const name& approver = delegates[0];
-            ASSERT_SUCCESS(worker.push_action(approver, N(apprtspec), mvo()
-                ("tspec_id", tspec_app_id)
-                ("approver", approver)));
-
-            ASSERT_SUCCESS(worker.push_action(approver, N(unapprtspec), mvo()
-                ("tspec_id", tspec_app_id)
-                ("approver", approver)));
 
             ASSERT_SUCCESS(worker.push_action(tspec_author, N(deltspec), mvo()
                 ("tspec_id", tspec_app_id)));
@@ -616,18 +549,8 @@ try
 
         BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_DELEGATES_REVIEW);
 
-        for (size_t i = 0; i < delegates.size(); i++) {
-            const auto& delegate = delegates[i];
-            if ((i + 1) % 2) {
-                ASSERT_SUCCESS(worker.push_action(delegate, N(apprwork), mvo()
-                    ("tspec_id", tspec_id)
-                    ("approver", delegate.to_string())));
-            } else {
-                ASSERT_SUCCESS(worker.push_action(delegate, N(dapprwork), mvo()
-                    ("tspec_id", tspec_id)
-                    ("approver", delegate.to_string())));
-            }
-        }
+        ASSERT_SUCCESS(worker.push_action(_code, N(apprwork), mvo()
+            ("tspec_id", tspec_id)));
 
         BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT);
 
@@ -679,13 +602,8 @@ try
         ("worker", worker_account)));
 
     // vote for the 0 technical specification application
-    for (size_t i = 0; i < delegates_51; i++) {
-        const auto& delegate = delegates[i];
-
-        ASSERT_SUCCESS(worker.push_action(delegate, N(apprtspec), mvo()
-            ("tspec_id", tspec_id)
-            ("approver", delegate.to_string())));
-    }
+    ASSERT_SUCCESS(worker.push_action(_code, N(apprtspec), mvo()
+        ("tspec_id", tspec_id)));
 
     BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT);
 
@@ -775,12 +693,8 @@ try
     // the application fund quantity should be `tspec_deposit` less if tspec is approved
     BOOST_REQUIRE_EQUAL(worker.get_fund(worker_code_account, worker_code_account)["quantity"].as<asset>(), app_fund_supply - tspec_deposit);
 
-    for (size_t i = 0; i < delegates.size() * 3 / 4 + 1; i++) {
-        const auto& delegate = delegates[i];
-        ASSERT_SUCCESS(worker.push_action(delegate, N(dapprwork), mvo()
-            ("tspec_id", tspec_id)
-            ("approver", delegate)));
-    }
+    ASSERT_SUCCESS(worker.push_action(_code, N(dapprwork), mvo()
+        ("tspec_id", tspec_id)));
 
     BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_CLOSED_BY_WITNESSES);
     BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
