@@ -182,49 +182,6 @@ public:
 
 BOOST_AUTO_TEST_SUITE(cyber_worker_tests)
 
-BOOST_FIXTURE_TEST_CASE(proposal_CUD, cyber_worker_tester)
-try
-{
-    BOOST_TEST_MESSAGE("Testing: proposal_CUD");
-
-    for (uint64_t i = 0; i < 10; i++) {
-        const uint64_t proposal_id = i;
-        const name& author_account = members[i];
-
-        ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
-            ("comment_id", proposal_id)
-            ("author", author_account)
-            ("text", "Proposal #1")));
-        ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
-            ("proposal_id", proposal_id)
-            ("author", author_account)
-            ("type", static_cast<uint8_t>(TYPE_TASK))));
-        auto proposal_row = worker.get_proposal(proposal_id);
-        BOOST_REQUIRE_EQUAL(proposal_row["id"], proposal_id);
-        BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_TASK);
-        BOOST_REQUIRE_EQUAL(proposal_row["author"], author_account.to_string());
-        BOOST_REQUIRE_EQUAL(proposal_row["state"], STATE_TSPEC_APP);
-
-        ASSERT_SUCCESS(worker.push_action(author_account, N(editpropos), mvo()
-            ("proposal_id", proposal_id)
-            ("type", static_cast<uint8_t>(TYPE_DONE))));
-        proposal_row = worker.get_proposal(proposal_id);
-        BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_DONE);
-
-        ASSERT_SUCCESS(worker.push_action(author_account, N(editpropos), mvo()
-            ("proposal_id", proposal_id)
-            ("type", static_cast<uint8_t>(TYPE_TASK))));
-        proposal_row = worker.get_proposal(proposal_id);
-        BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_TASK);
-
-        ASSERT_SUCCESS(worker.push_action(author_account, N(delpropos), mvo()
-            ("proposal_id", proposal_id)));
-        proposal_row = worker.get_proposal(proposal_id);
-        BOOST_REQUIRE(proposal_row.is_null());
-    }
-}
-FC_LOG_AND_RETHROW()
-
 BOOST_FIXTURE_TEST_CASE(comment_CUD, cyber_worker_tester)
 try
 {
@@ -330,6 +287,353 @@ try
 }
 FC_LOG_AND_RETHROW()
 
+BOOST_AUTO_TEST_SUITE(proposal_tests)
+
+BOOST_FIXTURE_TEST_CASE(proposal_create, cyber_worker_tester) try {
+    BOOST_TEST_MESSAGE("Testing: proposal_create");
+
+    const auto& author_account = members[0];
+
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
+        ("comment_id", 0)
+        ("author", author_account)
+        ("text", "I am post")));
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
+        ("comment_id", 1)
+        ("author", author_account)
+        ("parent_id", 0)
+        ("text", "I am comment")));
+    ASSERT_SUCCESS(worker.push_action(members[1], N(addcomment), mvo()
+        ("comment_id", 2)
+        ("author", members[1])
+        ("text", "I am post")));
+
+    BOOST_TEST_MESSAGE("-- wo post");
+    BOOST_CHECK_EQUAL(wasm_assert_msg("comment not exists"), worker.push_action(author_account, N(addpropos), mvo()
+        ("proposal_id", 3)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
+
+    BOOST_TEST_MESSAGE("-- comment instead of post");
+    BOOST_CHECK_EQUAL(wasm_assert_msg("comment is not root"), worker.push_action(author_account, N(addpropos), mvo()
+        ("proposal_id", 1)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
+
+    BOOST_TEST_MESSAGE("-- not own comment");
+    BOOST_CHECK_EQUAL(wasm_assert_msg("comment not your"), worker.push_action(author_account, N(addpropos), mvo()
+        ("proposal_id", 2)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
+
+    BOOST_TEST_MESSAGE("-- wrong type");
+    BOOST_CHECK_EQUAL(wasm_assert_msg("wrong type"), worker.push_action(author_account, N(addpropos), mvo()
+        ("proposal_id", 0)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_DONE)+1)));
+
+    BOOST_TEST_MESSAGE("-- wrong authority");
+    BOOST_CHECK_EQUAL("missing authority of membera", worker.push_action(members[1], N(addpropos), mvo()
+        ("proposal_id", 0)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
+
+    BOOST_TEST_MESSAGE("-- normal case");
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
+        ("proposal_id", 0)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
+    auto proposal_row = worker.get_proposal(0);
+    BOOST_REQUIRE_EQUAL(proposal_row["id"], 0);
+    BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_TASK);
+    BOOST_REQUIRE_EQUAL(proposal_row["author"], author_account.to_string());
+    BOOST_REQUIRE_EQUAL(proposal_row["state"], STATE_TSPEC_APP);
+
+    BOOST_TEST_MESSAGE("-- trying create with same id case");
+    BOOST_CHECK_EQUAL(wasm_assert_msg("already exists"), worker.push_action(author_account, N(addpropos), mvo()
+        ("proposal_id", 0)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(proposal_update, cyber_worker_tester) try {
+    BOOST_TEST_MESSAGE("Testing: proposal_update");
+
+    const auto& author_account = members[0];
+
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
+        ("comment_id", 0)
+        ("author", author_account)
+        ("text", "I am post")));
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
+        ("proposal_id", 0)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
+
+    BOOST_TEST_MESSAGE("-- wrong type");
+    BOOST_CHECK_EQUAL(wasm_assert_msg("wrong type"), worker.push_action(author_account, N(editpropos), mvo()
+        ("proposal_id", 0)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_DONE)+1)));
+
+    BOOST_TEST_MESSAGE("-- not-exist");
+    BOOST_CHECK_EQUAL(wasm_assert_msg("proposal has not been found"), worker.push_action(author_account, N(editpropos), mvo()
+        ("proposal_id", 1)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_DONE))));
+
+    BOOST_TEST_MESSAGE("-- not own");
+    BOOST_CHECK_EQUAL("missing authority of membera", worker.push_action(members[1], N(editpropos), mvo()
+        ("proposal_id", 0)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_DONE))));
+
+    BOOST_TEST_MESSAGE("-- normal case");
+    ASSERT_SUCCESS(worker.push_action(author_account, N(editpropos), mvo()
+        ("proposal_id", 0)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_DONE))));
+    auto proposal_row = worker.get_proposal(0);
+    BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_DONE);
+
+    BOOST_TEST_MESSAGE("-- with tspecs");
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
+        ("comment_id", 1)
+        ("author", author_account)
+        ("text", "I am post")));
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
+        ("proposal_id", 1)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
+    auto tspec_app = mvo()
+        ("tspec_id", 1)
+        ("author", author_account)
+        ("proposal_id", 1)
+        ("tspec", mvo()
+            ("specification_cost", "1.000 APP")
+            ("development_cost", "1.000 APP")
+            ("payments_count", 1)
+            ("payments_interval", 1));
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addtspec), tspec_app));
+    BOOST_CHECK_EQUAL(wasm_assert_msg("proposal has tspecs"), worker.push_action(author_account, N(editpropos), mvo()
+        ("proposal_id", 1)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_DONE))));
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(proposal_delete, cyber_worker_tester) try {
+    BOOST_TEST_MESSAGE("Testing: proposal_delete");
+
+    const auto& author_account = members[0];
+
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
+        ("comment_id", 0)
+        ("author", author_account)
+        ("text", "I am post")));
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
+        ("proposal_id", 0)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_TASK))));
+    auto proposal_row = worker.get_proposal(0);
+    BOOST_REQUIRE(!proposal_row.is_null());
+
+    BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_TASK);
+    BOOST_TEST_MESSAGE("-- not-exist");
+    BOOST_CHECK_EQUAL(wasm_assert_msg("proposal has not been found"), worker.push_action(author_account, N(delpropos), mvo()
+        ("proposal_id", 1)));
+
+    BOOST_TEST_MESSAGE("-- not own");
+    BOOST_CHECK_EQUAL("missing authority of " + author_account.to_string(), worker.push_action(members[1], N(delpropos), mvo()
+        ("proposal_id", 0)));
+
+    BOOST_TEST_MESSAGE("-- normal case");
+    proposal_row = worker.get_proposal(0);
+    BOOST_REQUIRE(!proposal_row.is_null());
+    ASSERT_SUCCESS(worker.push_action(author_account, N(delpropos), mvo()
+        ("proposal_id", 0)));
+    proposal_row = worker.get_proposal(0);
+    BOOST_REQUIRE(proposal_row.is_null());
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(proposal_CUD, cyber_worker_tester)
+try
+{
+    BOOST_TEST_MESSAGE("Testing: proposal_CUD");
+
+    for (uint64_t i = 0; i < 10; i++) {
+        const uint64_t proposal_id = i;
+        const name& author_account = members[i];
+
+        ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
+            ("comment_id", proposal_id)
+            ("author", author_account)
+            ("text", "Proposal #1")));
+        ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
+            ("proposal_id", proposal_id)
+            ("author", author_account)
+            ("type", static_cast<uint8_t>(TYPE_TASK))));
+        auto proposal_row = worker.get_proposal(proposal_id);
+        BOOST_REQUIRE_EQUAL(proposal_row["id"], proposal_id);
+        BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_TASK);
+        BOOST_REQUIRE_EQUAL(proposal_row["author"], author_account.to_string());
+        BOOST_REQUIRE_EQUAL(proposal_row["state"], STATE_TSPEC_APP);
+
+        ASSERT_SUCCESS(worker.push_action(author_account, N(editpropos), mvo()
+            ("proposal_id", proposal_id)
+            ("type", static_cast<uint8_t>(TYPE_DONE))));
+        proposal_row = worker.get_proposal(proposal_id);
+        BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_DONE);
+
+        ASSERT_SUCCESS(worker.push_action(author_account, N(editpropos), mvo()
+            ("proposal_id", proposal_id)
+            ("type", static_cast<uint8_t>(TYPE_TASK))));
+        proposal_row = worker.get_proposal(proposal_id);
+        BOOST_REQUIRE_EQUAL(proposal_row["type"], TYPE_TASK);
+
+        ASSERT_SUCCESS(worker.push_action(author_account, N(delpropos), mvo()
+            ("proposal_id", proposal_id)));
+        proposal_row = worker.get_proposal(proposal_id);
+        BOOST_REQUIRE(proposal_row.is_null());
+    }
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(proposal_removal, cyber_worker_tester)
+try
+{
+    BOOST_TEST_MESSAGE("Testing: proposal_removal");
+
+    const uint64_t proposal_id = 0;
+    const name& proposal_author = members[0];
+    const name& tspec_author = members[1];
+    const name& comment_author = members[2];
+    constexpr size_t relative_rows_count = 10;
+
+    ASSERT_SUCCESS(worker.push_action(proposal_author, N(addcomment), mvo()
+        ("comment_id", proposal_id)
+        ("author", proposal_author)
+        ("text", "Proposal #1")));
+    ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
+        ("proposal_id", proposal_id)
+        ("author", proposal_author)
+        ("type", static_cast<uint8_t>(TYPE_TASK)))
+    );
+
+    BOOST_REQUIRE_EQUAL(worker.get_proposals(worker_code_account).size(), 1);
+
+    BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
+
+    for (uint64_t j = 0; j < relative_rows_count; j++) {
+        const uint64_t tspec_app_id = 100 + j;
+        const uint64_t comment_id = 1000 + j;
+
+        ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
+            ("comment_id", comment_id)
+            ("author", comment_author)
+            ("parent_id", proposal_id)
+            ("text", "Awesome!")));
+
+        ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
+            ("comment_id", tspec_app_id)
+            ("author", tspec_author)
+            ("text", "Awesome!")));
+        auto tspec_app = mvo()
+            ("tspec_id", tspec_app_id)
+            ("author", tspec_author)
+            ("proposal_id", proposal_id)
+            ("tspec", mvo()
+                ("specification_cost", "1.000 APP")
+                ("development_cost", "1.000 APP")
+                ("payments_count", 1)
+                ("payments_interval", 1));
+
+        ASSERT_SUCCESS(worker.push_action(tspec_author, N(addtspec), tspec_app));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker.get_comments().size(), relative_rows_count * 2 + 1); // comments + tspec posts + 1 proposal post
+    BOOST_REQUIRE_EQUAL(worker.get_tspecs(worker_code_account).size(), relative_rows_count);
+
+    BOOST_REQUIRE_EQUAL(worker.push_action(proposal_author, N(delpropos), mvo()
+        ("proposal_id", proposal_id)), wasm_assert_msg("proposal has tspecs"));
+
+    for (uint64_t j = 0; j < relative_rows_count; j++) {
+        const uint64_t tspec_app_id = 100 + j;
+        ASSERT_SUCCESS(worker.push_action(tspec_author, N(deltspec), mvo()
+                ("tspec_id", tspec_app_id)));
+    }
+    BOOST_REQUIRE_EQUAL(worker.get_tspecs(worker_code_account).size(), 0);
+
+    ASSERT_SUCCESS(worker.push_action(proposal_author, N(delpropos), mvo()
+        ("proposal_id", proposal_id)));
+
+    BOOST_REQUIRE_EQUAL(worker.get_proposals(worker_code_account).size(), 0);
+    BOOST_REQUIRE_EQUAL(worker.get_comments().size(), relative_rows_count * 2 + 1); // comments + tspec posts + 1 proposal post
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(done_proposal, cyber_worker_tester)
+try
+{
+    BOOST_TEST_MESSAGE("Testing: done_proposal");
+
+    auto& author_account = members[0];
+    auto& worker_account = members[1];
+    uint64_t proposal_id = 0;
+    uint64_t tspec_id = 1;
+    int payments_count = 3;
+
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
+        ("comment_id", proposal_id)
+        ("author", author_account)
+        ("text", "Sponsored proposal #1")));
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addpropos), mvo()
+        ("proposal_id", proposal_id)
+        ("author", author_account)
+        ("type", static_cast<uint8_t>(TYPE_DONE))));
+
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addcomment), mvo()
+        ("comment_id", tspec_id)
+        ("author", author_account)
+        ("text", "Technical specification #1")));
+    ASSERT_SUCCESS(worker.push_action(author_account, N(addtspec), mvo()
+        ("tspec_id", tspec_id)
+        ("author", author_account)
+        ("proposal_id", proposal_id)
+        ("tspec", mvo()
+            ("specification_cost", "5.000 APP")
+            ("development_cost", "5.000 APP")
+            ("payments_count", payments_count)
+            ("payments_interval", 1))
+        ("worker", worker_account)));
+
+    // vote for the 0 technical specification application
+    for (size_t i = 0; i < delegates_51; i++) {
+        const auto& delegate = delegates[i];
+
+        ASSERT_SUCCESS(worker.push_action(delegate, N(apprtspec), mvo()
+            ("tspec_id", tspec_id)
+            ("approver", delegate.to_string())));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT);
+
+    for (int i = 0; i < payments_count; i++) {
+        produce_block();
+        ASSERT_SUCCESS(worker.push_action(worker_account, N(payout), mvo()
+            ("ram_payer", worker_account)));
+    }
+
+    BOOST_REQUIRE_EQUAL(worker.get_tspec_state(tspec_id), STATE_PAYMENT_COMPLETE);
+    BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_CHOSE);
+
+    BOOST_REQUIRE_EQUAL(token.get_account(worker_account)["balance"], "15.000 APP");
+    BOOST_REQUIRE_EQUAL(token.get_account(author_account)["balance"], "15.000 APP");
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_AUTO_TEST_SUITE_END()
+
 BOOST_FIXTURE_TEST_CASE(vote_CUD, cyber_worker_tester)
 try
 {
@@ -434,79 +738,6 @@ try
 
         BOOST_REQUIRE(worker.get_proposal(proposal_id).is_null());
     }
-}
-FC_LOG_AND_RETHROW()
-
-BOOST_FIXTURE_TEST_CASE(proposal_removal, cyber_worker_tester)
-try
-{
-    BOOST_TEST_MESSAGE("Testing: proposal_removal");
-
-    const uint64_t proposal_id = 0;
-    const name& proposal_author = members[0];
-    const name& tspec_author = members[1];
-    const name& comment_author = members[2];
-    constexpr size_t relative_rows_count = 10;
-
-    ASSERT_SUCCESS(worker.push_action(proposal_author, N(addcomment), mvo()
-        ("comment_id", proposal_id)
-        ("author", proposal_author)
-        ("text", "Proposal #1")));
-    ASSERT_SUCCESS(worker.push_action(proposal_author, N(addpropos), mvo()
-        ("proposal_id", proposal_id)
-        ("author", proposal_author)
-        ("type", static_cast<uint8_t>(TYPE_TASK)))
-    );
-
-    BOOST_REQUIRE_EQUAL(worker.get_proposals(worker_code_account).size(), 1);
-
-    BOOST_REQUIRE_EQUAL(worker.get_proposal_state(proposal_id), STATE_TSPEC_APP);
-
-    for (uint64_t j = 0; j < relative_rows_count; j++) {
-        const uint64_t tspec_app_id = 100 + j;
-        const uint64_t comment_id = 1000 + j;
-
-        ASSERT_SUCCESS(worker.push_action(comment_author, N(addcomment), mvo()
-            ("comment_id", comment_id)
-            ("author", comment_author)
-            ("parent_id", proposal_id)
-            ("text", "Awesome!")));
-
-        ASSERT_SUCCESS(worker.push_action(tspec_author, N(addcomment), mvo()
-            ("comment_id", tspec_app_id)
-            ("author", tspec_author)
-            ("text", "Awesome!")));
-        auto tspec_app = mvo()
-            ("tspec_id", tspec_app_id)
-            ("author", tspec_author)
-            ("proposal_id", proposal_id)
-            ("tspec", mvo()
-                ("specification_cost", "1.000 APP")
-                ("development_cost", "1.000 APP")
-                ("payments_count", 1)
-                ("payments_interval", 1));
-
-        ASSERT_SUCCESS(worker.push_action(tspec_author, N(addtspec), tspec_app));
-    }
-
-    BOOST_REQUIRE_EQUAL(worker.get_comments().size(), relative_rows_count * 2 + 1); // comments + tspec posts + 1 proposal post
-    BOOST_REQUIRE_EQUAL(worker.get_tspecs(worker_code_account).size(), relative_rows_count);
-
-    BOOST_REQUIRE_EQUAL(worker.push_action(proposal_author, N(delpropos), mvo()
-        ("proposal_id", proposal_id)), wasm_assert_msg("proposal has tspecs"));
-
-    for (uint64_t j = 0; j < relative_rows_count; j++) {
-        const uint64_t tspec_app_id = 100 + j;
-        ASSERT_SUCCESS(worker.push_action(tspec_author, N(deltspec), mvo()
-                ("tspec_id", tspec_app_id)));
-    }
-    BOOST_REQUIRE_EQUAL(worker.get_tspecs(worker_code_account).size(), 0);
-
-    ASSERT_SUCCESS(worker.push_action(proposal_author, N(delpropos), mvo()
-        ("proposal_id", proposal_id)));
-
-    BOOST_REQUIRE_EQUAL(worker.get_proposals(worker_code_account).size(), 0);
-    BOOST_REQUIRE_EQUAL(worker.get_comments().size(), relative_rows_count * 2 + 1); // comments + tspec posts + 1 proposal post
 }
 FC_LOG_AND_RETHROW()
 
