@@ -194,10 +194,6 @@
                 {
                     "name": "tspec_id",
                     "type": "comment_id_t"
-                },
-                {
-                    "name": "approver",
-                    "type": "name"
                 }
             ]
         },
@@ -276,14 +272,6 @@
                 {
                     "name": "state",
                     "type": "uint8"
-                },
-                {
-                    "name": "created",
-                    "type": "uint64"
-                },
-                {
-                    "name": "modified",
-                    "type": "uint64"
                 }
             ]
         },
@@ -352,10 +340,6 @@
                     "type": "name"
                 },
                 {
-                    "name": "work_begining_time",
-                    "type": "uint64"
-                },
-                {
                     "name": "result_comment_id",
                     "type": "uint64?"
                 },
@@ -365,14 +349,6 @@
                 },
                 {
                     "name": "next_payout",
-                    "type": "uint64"
-                },
-                {
-                    "name": "created",
-                    "type": "uint64"
-                },
-                {
-                    "name": "modified",
                     "type": "uint64"
                 }
             ]
@@ -396,28 +372,6 @@
                 {
                     "name": "payments_interval",
                     "type": "uint32"
-                }
-            ]
-        },
-        {
-            "name": "vote_t",
-            "base": "",
-            "fields": [
-                {
-                    "name": "id",
-                    "type": "uint64"
-                },
-                {
-                    "name": "voter",
-                    "type": "name"
-                },
-                {
-                    "name": "foreign_id",
-                    "type": "uint64"
-                },
-                {
-                    "name": "positive",
-                    "type": "bool"
                 }
             ]
         },
@@ -492,10 +446,6 @@
             "type": "approve"
         },
         {
-            "name": "unapprtspec",
-            "type": "approve"
-        },
-        {
             "name": "startwork",
             "type": "startwork"
         },
@@ -517,10 +467,6 @@
         },
         {
             "name": "dapprwork",
-            "type": "approve"
-        },
-        {
-            "name": "unapprwork",
             "type": "approve"
         },
         {
@@ -587,51 +533,12 @@
             }]
         },
         {
-            "name": "proposalsv",
-            "type": "vote_t",
-            "indexes": [{
-                "name": "primary",
-                "unique": true,
-                "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "foreign",
-                "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
-            }]
-        },
-        {
             "name": "state",
             "type": "state_t",
             "indexes": [{
                 "name": "primary",
                 "unique": true,
                 "orders": [{"field": "id", "order": "asc"}]
-            }]
-        },
-        {
-            "name": "tspecv",
-            "type": "vote_t",
-            "indexes": [{
-                "name": "primary",
-                "unique": true,
-                "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "foreign",
-                "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
-            }]
-        },
-        {
-            "name": "tspecrv",
-            "type": "vote_t",
-            "indexes": [{
-                "name": "primary",
-                "unique": true,
-                "orders": [{"field": "id", "order": "asc"}]
-            }, {
-                "name": "foreign",
-                "unique": false,
-                "orders": [{"field": "foreign_id", "order": "asc"}]
             }]
         },
         {
