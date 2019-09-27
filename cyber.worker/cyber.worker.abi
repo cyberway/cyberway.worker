@@ -272,14 +272,6 @@
                 {
                     "name": "state",
                     "type": "uint8"
-                },
-                {
-                    "name": "created",
-                    "type": "uint64"
-                },
-                {
-                    "name": "modified",
-                    "type": "uint64"
                 }
             ]
         },
@@ -348,10 +340,6 @@
                     "type": "name"
                 },
                 {
-                    "name": "work_begining_time",
-                    "type": "uint64"
-                },
-                {
                     "name": "result_comment_id",
                     "type": "uint64?"
                 },
@@ -361,14 +349,6 @@
                 },
                 {
                     "name": "next_payout",
-                    "type": "uint64"
-                },
-                {
-                    "name": "created",
-                    "type": "uint64"
-                },
-                {
-                    "name": "modified",
                     "type": "uint64"
                 }
             ]

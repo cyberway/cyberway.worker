@@ -88,16 +88,12 @@ public:
         eosio::name fund_name;
         asset deposit;
         eosio::name worker;
-        uint64_t work_begining_time;
         std::optional<comment_id_t> result_comment_id;
         uint8_t worker_payments_count;
         uint64_t next_payout;
-        uint64_t created;
-        uint64_t modified;
 
         EOSLIB_SERIALIZE(tspec_app_t, (id)(foreign_id)(author)(state)(data)(fund_name)(deposit)(worker)
-            (work_begining_time)(result_comment_id)(worker_payments_count)(next_payout)
-            (created)(modified))
+            (result_comment_id)(worker_payments_count)(next_payout))
 
         uint64_t primary_key() const { return id; }
         uint64_t foreign_key() const { return foreign_id; }
@@ -126,8 +122,6 @@ public:
         eosio::name author;
         uint8_t type;
         uint8_t state;
-        uint64_t created;
-        uint64_t modified;
 
         uint64_t primary_key() const { return id; }
         void set_state(state_t new_state) { state = new_state; }
